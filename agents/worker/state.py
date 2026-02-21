@@ -6,7 +6,7 @@ from typing import Any, TypedDict
 from google import genai
 from google.genai import types
 
-from research_assistant.agents.worker.schemas import Limits, SpawnTask, WorkerResult
+from deep_research_agent.agents.worker.schemas import Limits, SpawnTask, WorkerResult
 
 class WorkerState(TypedDict, total=False):
     """State for the worker graph. Input keys: task, limits, tool_names, model."""

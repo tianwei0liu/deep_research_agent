@@ -2,7 +2,7 @@
 Example: run the worker with a single delegated task (§3.4 example payload).
 
 Usage:
-  cd research_assistant && pip install -e .
+  cd deep_research_agent && pip install -e .
   Put sensitive API keys in .env (GOOGLE_GEMINI_API_KEY, TAVILY_API_KEY). Non-sensitive
   options are in config/settings.yaml; LangSmith options there are applied to os.environ.
   python3 examples/run_worker.py [--verbose]
@@ -14,7 +14,7 @@ import logging
 import os
 import sys
 
-# Project root (parent of examples/); add parent of project root so "research_assistant" package resolves
+# Project root (parent of examples/); add parent of project root so "deep_research_agent" package resolves
 _root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.dirname(_root))
 os.chdir(_root)
@@ -25,10 +25,10 @@ load_dotenv()
 
 # Load config so LangSmith env vars (tracing, project, endpoint) are set before any
 # runs.
-from research_assistant.config import Settings
+from deep_research_agent.config import Settings
 Settings.load()
 
-from research_assistant import Limits, SpawnTask, Worker
+from deep_research_agent import Limits, SpawnTask, Worker
 
 logger = logging.getLogger(__name__)
 

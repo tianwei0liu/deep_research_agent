@@ -3,7 +3,7 @@ Tool Registry: Central repository for all available tools.
 """
 
 from typing import Any, Callable
-from research_assistant.config import Settings
+from deep_research_agent.config import Settings
 
 
 
@@ -52,11 +52,11 @@ class ToolRegistry:
     @classmethod
     def register_all_tools(cls):
         """Register all default tools."""
-        from research_assistant.tools import tavily
-        from research_assistant.tools import filesystem
-        from research_assistant.tools import planning
-        from research_assistant.tools import delegation
-        from research_assistant.tools import control
+        from deep_research_agent.tools import tavily
+        from deep_research_agent.tools import filesystem
+        from deep_research_agent.tools import planning
+        from deep_research_agent.tools import delegation
+        from deep_research_agent.tools import control
 
         # 1. Search
         cls.register(

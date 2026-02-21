@@ -6,7 +6,7 @@ Moved from agent/states.py.
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
-from research_assistant.agents.orchestrator.schemas import TaskStatus
+from deep_research_agent.agents.orchestrator.schemas import TaskStatus
 
 
 # --- Spawn input (from lead) ---

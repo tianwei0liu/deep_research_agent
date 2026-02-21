@@ -1,5 +1,5 @@
 """
-Tracing utilities for the Research Assistant.
+Tracing utilities for the Deep Research Agent.
 Wraps langsmith.traceable with project-specific defaults.
 """
 

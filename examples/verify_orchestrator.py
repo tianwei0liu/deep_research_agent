@@ -49,27 +49,27 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Load settings to enable LangSmith tracing (if configured in config/settings.yaml/env)
-from research_assistant.config import Settings
+from deep_research_agent.config import Settings
 Settings.load()
 
-# Set research_assistant logger to INFO (or remove this line to inherit from root)
-# logging.getLogger("research_assistant.agents.orchestrator.supervisor").setLevel(logging.DEBUG)
+# Set deep_research_agent logger to INFO (or remove this line to inherit from root)
+# logging.getLogger("deep_research_agent.agents.orchestrator.supervisor").setLevel(logging.DEBUG)
 
 from langchain_core.messages import HumanMessage
-# from research_assistant.agents.orchestrator.graph import build_orchestrator_graph
+# from deep_research_agent.agents.orchestrator.graph import build_orchestrator_graph
 
 async def main() -> None:
     """Run the orchestrator verification."""
     logger.info("Building Orchestrator Graph...")
-    from research_assistant.agents.orchestrator.graph import OrchestratorGraph
+    from deep_research_agent.agents.orchestrator.graph import OrchestratorGraph
     orchestrator = OrchestratorGraph()
     app = orchestrator.compile()
     
     query = "What is the current state of AI Agents in 2025 according to Anthropic?"
     logger.info("Running query: %s", query)
     
-    from research_assistant.agents.orchestrator.state import OrchestratorConfig
-    from research_assistant.agents.worker.schemas import Limits
+    from deep_research_agent.agents.orchestrator.state import OrchestratorConfig
+    from deep_research_agent.agents.worker.schemas import Limits
 
     config = OrchestratorConfig(
         messages=[HumanMessage(content=query)],

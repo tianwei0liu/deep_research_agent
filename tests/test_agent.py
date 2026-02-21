@@ -3,9 +3,9 @@
 import pytest
 from pydantic import ValidationError
 
-from research_assistant.agents.worker.schemas import Limits, SpawnTask, WorkerResult
-from research_assistant.agents.orchestrator.schemas import TaskStatus
-from research_assistant.agents.worker.worker import Worker
+from deep_research_agent.agents.worker.schemas import Limits, SpawnTask, WorkerResult
+from deep_research_agent.agents.orchestrator.schemas import TaskStatus
+from deep_research_agent.agents.worker.worker import Worker
 
 
 def test_spawn_task_validation():

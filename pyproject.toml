@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "research-assistant"
+name = "deep-research-agent"
 version = "0.1.0"
 description = "A multi-agent research system that autonomously conducts deep web research using a Supervisor-Worker architecture built on LangGraph."
 readme = "README.md"
@@ -23,12 +23,16 @@ dev = [
     "pytest-asyncio>=1.3",
 ]
 
-# Package is the project root (no nested research_assistant/research_assistant/)
+# Package is the project root (no nested deep_research_agent/deep_research_agent/)
 [tool.setuptools.package-dir]
-"research_assistant" = "."
+"deep_research_agent" = "."
 
 [tool.setuptools.packages]
-packages = ["research_assistant", "research_assistant.config", "research_assistant.agents", "research_assistant.agents.worker", "research_assistant.agents.orchestrator", "research_assistant.agents.utils", "research_assistant.tools"]
+packages = ["deep_research_agent", "deep_research_agent.config", "deep_research_agent.agents", "deep_research_agent.agents.worker", "deep_research_agent.agents.orchestrator", "deep_research_agent.agents.utils", "deep_research_agent.tools"]
 
 [tool.setuptools.package-data]
-research_assistant.config = ["settings.yaml"]
+deep_research_agent.config = ["settings.yaml"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "strict"
+pythonpath = ["..", "."]

@@ -2,7 +2,7 @@
 
 from langsmith import traceable
 
-from research_assistant.agents.worker.schemas import Limits, SpawnTask
+from deep_research_agent.agents.worker.schemas import Limits, SpawnTask
 
 
 class WorkerPrompts:

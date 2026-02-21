@@ -12,12 +12,12 @@ from typing import Any, Dict, List, Optional
 
 from langchain_core.messages import HumanMessage
 
-from research_assistant.agents.orchestrator.graph import OrchestratorGraph
-from research_assistant.agents.orchestrator.state import OrchestratorConfig
-from research_assistant.agents.worker.schemas import Limits
-from research_assistant.benchmarks.benchmark_case import BenchmarkCase, EvaluationResult
-from research_assistant.benchmarks.grader import BenchmarkGrader
-from research_assistant.config import Settings
+from deep_research_agent.agents.orchestrator.graph import OrchestratorGraph
+from deep_research_agent.agents.orchestrator.state import OrchestratorConfig
+from deep_research_agent.agents.worker.schemas import Limits
+from deep_research_agent.benchmarks.benchmark_case import BenchmarkCase, EvaluationResult
+from deep_research_agent.benchmarks.grader import BenchmarkGrader
+from deep_research_agent.config import Settings
 
 
 # Default path to the core benchmark dataset, relative to the package directory.

@@ -6,8 +6,8 @@ import logging
 from typing import Any, Callable
 from pydantic import BaseModel, Field
 
-from research_assistant.config import Settings
-from research_assistant.agents.worker.schemas import SpawnTask, Limits, WorkerResult
+from deep_research_agent.config import Settings
+from deep_research_agent.agents.worker.schemas import SpawnTask, Limits, WorkerResult
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class DelegationTool:
         logger.info(f"Delegating research for task {task_id}: {objective}")
         
         # Lazy import to avoid circular dependency
-        from research_assistant.agents.worker.worker import Worker
+        from deep_research_agent.agents.worker.worker import Worker
         
         # We spawn the worker with its own tools (e.g. tavily)
         worker = Worker(settings=self.settings)

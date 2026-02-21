@@ -5,8 +5,8 @@ Worker Graph: Definition and construction of the Worker StateGraph.
 from typing import Any, Literal
 from langgraph.graph import END, START, StateGraph
 
-from research_assistant.agents.worker.state import WorkerState
-from research_assistant.agents.worker.nodes import WorkerNodes
+from deep_research_agent.agents.worker.state import WorkerState
+from deep_research_agent.agents.worker.nodes import WorkerNodes
 
 
 class WorkerGraph:

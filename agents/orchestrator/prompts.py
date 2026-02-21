@@ -3,8 +3,8 @@ Prompts for the Orchestrator (Supervisor and Composer).
 """
 
 from typing import List
-from research_assistant.agents.utils.tracing import Tracing
-from research_assistant.agents.orchestrator.state import ResearchTask
+from deep_research_agent.agents.utils.tracing import Tracing
+from deep_research_agent.agents.orchestrator.state import ResearchTask
 
 class OrchestratorPrompts:
     

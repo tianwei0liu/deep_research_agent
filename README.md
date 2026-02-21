@@ -1,4 +1,4 @@
-# Research Assistant
+# Deep Research Agent
 
 A multi-agent research system that autonomously conducts deep web research to answer complex questions. Inspired by [Anthropic's multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system).
 
@@ -74,10 +74,10 @@ from langchain_core.messages import HumanMessage
 
 load_dotenv()
 
-from research_assistant.config import Settings
-from research_assistant.agents.orchestrator.graph import OrchestratorGraph
-from research_assistant.agents.orchestrator.state import OrchestratorConfig
-from research_assistant.agents.worker.schemas import Limits
+from deep_research_agent.config import Settings
+from deep_research_agent.agents.orchestrator.graph import OrchestratorGraph
+from deep_research_agent.agents.orchestrator.state import OrchestratorConfig
+from deep_research_agent.agents.worker.schemas import Limits
 
 Settings.load()
 
@@ -123,7 +123,7 @@ All non-sensitive settings live in [`config/settings.yaml`](config/settings.yaml
 ## Project Structure
 
 ```
-research_assistant/
+deep_research_agent/
 ├── __init__.py                  # Public API
 ├── config/
 │   ├── settings.py              # Settings loader (YAML + env)
@@ -154,6 +154,7 @@ research_assistant/
 │   ├── tavily.py                # Web search via Tavily API
 │   └── filesystem.py            # write_file
 ├── benchmarks/
+│   ├── benchmark_case.py        # Benchmark case model
 │   ├── datasets/core.json       # Benchmark cases
 │   ├── runner.py                # Benchmark runner
 │   └── grader.py                # LLM-based answer grading
@@ -168,23 +169,26 @@ research_assistant/
 ## Running Examples
 
 ```bash
+# Install in dev mode first (if not already done)
+pip install -e ".[dev]"
+
 # Run a full orchestrator verification
-PYTHONPATH=.. python3 examples/verify_orchestrator.py
+python3 examples/verify_orchestrator.py
 
 # Run the benchmark suite
-PYTHONPATH=.. python3 examples/run_benchmark.py
+python3 examples/run_benchmark.py
 
 # Run a single worker
-PYTHONPATH=.. python3 examples/run_worker.py
+python3 examples/run_worker.py
 
-# Enable debug logging
-PYTHONPATH=.. python3 examples/verify_orchestrator.py --verbose
+# Run parallel orchestrator
+python3 examples/verify_parallel_orchestrator.py
 ```
 
 ## Running Tests
 
 ```bash
-PYTHONPATH=.. pytest tests/ -v
+pytest tests/ -v
 ```
 
 ## Documentation

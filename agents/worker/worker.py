@@ -15,14 +15,14 @@ from __future__ import annotations
 from typing import Any
 
 from google import genai
-from research_assistant.agents.utils.tracing import Tracing
+from deep_research_agent.agents.utils.tracing import Tracing
 
-from research_assistant.config import Settings
-from research_assistant.agents.worker.schemas import Limits, SpawnTask, WorkerResult
-from research_assistant.agents.orchestrator.schemas import TaskStatus
-from research_assistant.agents.worker.state import WorkerState
-from research_assistant.agents.worker.nodes import WorkerNodes
-from research_assistant.agents.worker.graph import WorkerGraph
+from deep_research_agent.config import Settings
+from deep_research_agent.agents.worker.schemas import Limits, SpawnTask, WorkerResult
+from deep_research_agent.agents.orchestrator.schemas import TaskStatus
+from deep_research_agent.agents.worker.state import WorkerState
+from deep_research_agent.agents.worker.nodes import WorkerNodes
+from deep_research_agent.agents.worker.graph import WorkerGraph
 
 
 class Worker:

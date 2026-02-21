@@ -2,8 +2,8 @@
 
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
-from research_assistant.tools.tavily import TavilySearchTool
-from research_assistant.config import Settings
+from deep_research_agent.tools.tavily import TavilySearchTool
+from deep_research_agent.config import Settings
 
 
 @pytest.mark.asyncio

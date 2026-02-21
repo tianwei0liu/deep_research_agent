@@ -14,15 +14,15 @@ from google import genai
 from google.genai import types
 from langsmith import trace
 
-from research_assistant.agents.utils.tracing import Tracing
-from research_assistant.agents.utils.cache_manager import get_process_level_cache
+from deep_research_agent.agents.utils.tracing import Tracing
+from deep_research_agent.agents.utils.cache_manager import get_process_level_cache
 
-from research_assistant.config import Settings
-from research_assistant.agents.worker.schemas import WorkerResult
-from research_assistant.agents.orchestrator.schemas import TaskStatus
-from research_assistant.agents.worker.prompts import WorkerPrompts
-from research_assistant.agents.worker.state import WorkerState
-from research_assistant.tools.registry import ToolRegistry
+from deep_research_agent.config import Settings
+from deep_research_agent.agents.worker.schemas import WorkerResult
+from deep_research_agent.agents.orchestrator.schemas import TaskStatus
+from deep_research_agent.agents.worker.prompts import WorkerPrompts
+from deep_research_agent.agents.worker.state import WorkerState
+from deep_research_agent.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 

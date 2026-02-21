@@ -4,7 +4,7 @@ Control tools: Signals for loop termination.
 
 from typing import Any, Callable
 from pydantic import BaseModel, Field
-from research_assistant.config import Settings
+from deep_research_agent.config import Settings
 
 
 class ControlTool:

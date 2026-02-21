@@ -16,14 +16,14 @@ from typing import List, Any, Optional, Dict, Tuple
 
 from google import genai
 from google.genai import types
-from research_assistant.agents.utils.tracing import Tracing
+from deep_research_agent.agents.utils.tracing import Tracing
 
 from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage, AIMessage, BaseMessage
 
-from research_assistant.config import Settings
-from research_assistant.agents.orchestrator.schemas import TaskStatus
-from research_assistant.agents.orchestrator.state import OrchestratorState
-from research_assistant.agents.orchestrator.prompts import OrchestratorPrompts
+from deep_research_agent.config import Settings
+from deep_research_agent.agents.orchestrator.schemas import TaskStatus
+from deep_research_agent.agents.orchestrator.state import OrchestratorState
+from deep_research_agent.agents.orchestrator.prompts import OrchestratorPrompts
 
 # Tool Registry
 
@@ -180,7 +180,7 @@ class Supervisor:
             model_id = self.settings.planner_model 
             
             # Resolve Tools dynamically
-            from research_assistant.tools.registry import ToolRegistry
+            from deep_research_agent.tools.registry import ToolRegistry
             tool_names = ["add_task", "update_task_status", "remove_task", "write_file", "delegate_research", "finish"]
             declarations, _ = ToolRegistry.resolve(tool_names, self.settings)
             
@@ -245,7 +245,7 @@ class Supervisor:
                         self.logger.warning("Injected dummy user message to fix turn order.")
             
             # CACHE LOOKUP
-            from research_assistant.agents.utils.cache_manager import get_process_level_cache
+            from deep_research_agent.agents.utils.cache_manager import get_process_level_cache
             
             cached_name = await get_process_level_cache(
                 client,
@@ -305,7 +305,7 @@ class Supervisor:
         todos = state.get("todos", [])
         
         # Resolve tool implementations
-        from research_assistant.tools.registry import ToolRegistry
+        from deep_research_agent.tools.registry import ToolRegistry
         tool_names = ["add_task", "update_task_status", "remove_task", "write_file", "delegate_research", "finish"]
         _, impls = ToolRegistry.resolve(tool_names, self.settings)
         
@@ -373,7 +373,7 @@ class Supervisor:
             call_id = tool_call["id"]
             
             try:
-                from research_assistant.tools.delegation import DelegationTool
+                from deep_research_agent.tools.delegation import DelegationTool
                 dt = DelegationTool(self.settings)
 
                 # Auto-inject context from completed dependencies

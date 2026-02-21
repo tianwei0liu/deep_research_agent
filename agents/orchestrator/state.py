@@ -6,11 +6,11 @@ from typing import List, Optional, TypedDict, Annotated
 from langgraph.graph.message import add_messages
 from langchain_core.messages import BaseMessage
 
-from research_assistant.agents.worker.schemas import WorkerResult, Limits
-from research_assistant.agents.orchestrator.schemas import ResearchTask, TaskStatus
+from deep_research_agent.agents.worker.schemas import WorkerResult, Limits
+from deep_research_agent.agents.orchestrator.schemas import ResearchTask, TaskStatus
 from pydantic import BaseModel, Field
 
-from research_assistant.config import Settings
+from deep_research_agent.config import Settings
 
 
 class OrchestratorState(TypedDict):

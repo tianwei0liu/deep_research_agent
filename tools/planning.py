@@ -6,8 +6,8 @@ import logging
 from typing import Literal, Optional, List, Any, Callable
 from pydantic import BaseModel, Field
 
-from research_assistant.config import Settings
-from research_assistant.agents.orchestrator.schemas import ResearchTask, TaskStatus
+from deep_research_agent.config import Settings
+from deep_research_agent.agents.orchestrator.schemas import ResearchTask, TaskStatus
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for considering contributing to **Research Assistant**! This guide will help you get started.
+Thank you for considering contributing to **Deep Research Agent**! This guide will help you get started.
 
 ## Prerequisites
 
@@ -23,7 +23,7 @@ cp .env.example .env
 ## Running Tests
 
 ```bash
-PYTHONPATH=.. python3 -m pytest tests/ -v
+pytest tests/ -v
 ```
 
 ## Code Style

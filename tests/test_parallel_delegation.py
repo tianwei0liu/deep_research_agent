@@ -14,10 +14,10 @@ from unittest.mock import AsyncMock, patch, MagicMock
 
 from langchain_core.messages import AIMessage, ToolMessage
 
-from research_assistant.agents.orchestrator.supervisor import Supervisor
-from research_assistant.agents.orchestrator.schemas import ResearchTask, TaskStatus
-from research_assistant.tools.planning import PlanningTool
-from research_assistant.config import Settings
+from deep_research_agent.agents.orchestrator.supervisor import Supervisor
+from deep_research_agent.agents.orchestrator.schemas import ResearchTask, TaskStatus
+from deep_research_agent.tools.planning import PlanningTool
+from deep_research_agent.config import Settings
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +78,7 @@ async def test_parallel_workers_execute_concurrently(supervisor):
         }
 
     with patch(
-        "research_assistant.tools.delegation.DelegationTool.delegate_research",
+        "deep_research_agent.tools.delegation.DelegationTool.delegate_research",
         mock_delegate,
     ):
         start = time.monotonic()
@@ -208,7 +208,7 @@ async def test_supervisor_injects_context_from_dependencies(supervisor):
         }
 
     with patch(
-        "research_assistant.tools.delegation.DelegationTool.delegate_research",
+        "deep_research_agent.tools.delegation.DelegationTool.delegate_research",
         mock_delegate,
     ):
         await supervisor.execute_tools(state)
@@ -248,7 +248,7 @@ async def test_no_context_for_independent_tasks(supervisor):
         }
 
     with patch(
-        "research_assistant.tools.delegation.DelegationTool.delegate_research",
+        "deep_research_agent.tools.delegation.DelegationTool.delegate_research",
         mock_delegate,
     ):
         await supervisor.execute_tools(state)

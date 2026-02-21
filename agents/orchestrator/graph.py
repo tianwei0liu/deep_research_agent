@@ -7,9 +7,9 @@ from typing import Literal, Dict, Any
 from langgraph.graph import StateGraph, START, END
 import logging
 
-from research_assistant.agents.orchestrator.state import OrchestratorState
-from research_assistant.agents.orchestrator.supervisor import Supervisor
-from research_assistant.agents.orchestrator.composer import Composer
+from deep_research_agent.agents.orchestrator.state import OrchestratorState
+from deep_research_agent.agents.orchestrator.supervisor import Supervisor
+from deep_research_agent.agents.orchestrator.composer import Composer
 
 class OrchestratorGraph:
     """
@@ -46,7 +46,7 @@ class OrchestratorGraph:
 
         # No tool calls — check if research was performed (implicit finish).
         todos = state.get("todos", [])
-        from research_assistant.agents.orchestrator.schemas import TaskStatus
+        from deep_research_agent.agents.orchestrator.schemas import TaskStatus
         actionable_statuses = {TaskStatus.COMPLETED, TaskStatus.PARTIAL, TaskStatus.FAILED}
         has_findings = any(t.status in actionable_statuses for t in todos)
 

@@ -1,6 +1,6 @@
 """Worker: ReAct loop, prompts, runner."""
 
-from research_assistant.agents.worker.prompts import WorkerPrompts
-from research_assistant.agents.worker.worker import Worker
+from deep_research_agent.agents.worker.prompts import WorkerPrompts
+from deep_research_agent.agents.worker.worker import Worker
 
 __all__ = ["Worker", "WorkerPrompts"]

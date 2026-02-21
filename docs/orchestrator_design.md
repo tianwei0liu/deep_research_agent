@@ -1,7 +1,7 @@
 # Orchestrator Design Document (Dynamic Supervisor)
 
 ## 1. Overview
-The Orchestrator is the central "Supervisor" of the research assistant system. It uses a **Dynamic Supervisor** pattern (similar to ReAct or LangGraph Supervisor) to manage a living "Todo List" of research tasks. Unlike a static planner, it iteratively plans, delegates, and reacts to findings in a loop until the user's request is fully satisfied.
+The Orchestrator is the central "Supervisor" of the deep research agent system. It uses a **Dynamic Supervisor** pattern (similar to ReAct or LangGraph Supervisor) to manage a living "Todo List" of research tasks. Unlike a static planner, it iteratively plans, delegates, and reacts to findings in a loop until the user's request is fully satisfied.
 
 ## 2. Architecture
 

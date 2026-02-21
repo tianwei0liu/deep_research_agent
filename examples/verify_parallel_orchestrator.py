@@ -15,14 +15,14 @@ import uuid
 import sys
 import os
 
-# Adjust path to include root (research_assistant package parent)
+# Adjust path to include root (deep_research_agent package parent)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from langchain_core.messages import AIMessage, ToolMessage
-from research_assistant.agents.orchestrator.state import OrchestratorState, ResearchTask
-from research_assistant.agents.orchestrator.schemas import TaskStatus
-from research_assistant.agents.orchestrator.supervisor import Supervisor
-from research_assistant.tools.registry import ToolRegistry
+from deep_research_agent.agents.orchestrator.state import OrchestratorState, ResearchTask
+from deep_research_agent.agents.orchestrator.schemas import TaskStatus
+from deep_research_agent.agents.orchestrator.supervisor import Supervisor
+from deep_research_agent.tools.registry import ToolRegistry
 
 # Configure logging to both console and file
 # Log to examples/ folder as per GEMINI.md

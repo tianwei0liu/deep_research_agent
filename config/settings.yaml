@@ -1,5 +1,5 @@
-# Non-sensitive configuration for research_assistant.
-# Override with env vars (e.g. RESEARCH_ASSISTANT_SUBAGENT_MODEL) if needed.
+# Non-sensitive configuration for deep_research_agent.
+# Override with env vars (e.g. DEEP_RESEARCH_AGENT_SUBAGENT_MODEL) if needed.
 # API keys are never stored here; use .env for sensitive keys only.
 
 # Worker and tools
@@ -24,7 +24,7 @@ grader_thinking_level: "medium"
 # LangSmith / LangChain (tracing); SDK reads from environment — we set these from YAML at load time
 langchain:
   tracing_v2: true
-  project: "research_assistant"
+  project: "deep_research_agent"
 langsmith_endpoint: "https://api.smith.langchain.com"
 
 # Optional: DeepSeek base URL (when using DeepSeek client)

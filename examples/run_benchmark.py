@@ -122,10 +122,10 @@ async def _run(args: argparse.Namespace, logger: logging.Logger) -> None:
         logger: Configured logger.
     """
     # Load settings to enable LangSmith tracing (if configured)
-    from research_assistant.config import Settings
+    from deep_research_agent.config import Settings
     Settings.load()
 
-    from research_assistant.benchmarks.runner import BenchmarkRunner
+    from deep_research_agent.benchmarks.runner import BenchmarkRunner
 
     runner = BenchmarkRunner()
 

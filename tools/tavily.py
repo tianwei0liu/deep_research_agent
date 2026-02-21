@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 import httpx
 from langsmith import traceable
 
-from research_assistant.config import Settings
+from deep_research_agent.config import Settings
 
 logger = logging.getLogger(__name__)
 

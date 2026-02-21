@@ -111,7 +111,7 @@ def route_supervisor(self, state: OrchestratorState) -> Literal["tool_execution_
 
     # No tool calls — check if research was performed (implicit finish).
     todos = state.get("todos", [])
-    from research_assistant.agents.orchestrator.schemas import TaskStatus
+    from deep_research_agent.agents.orchestrator.schemas import TaskStatus
     actionable_statuses = {TaskStatus.COMPLETED, TaskStatus.PARTIAL, TaskStatus.FAILED}
     has_findings = any(t.status in actionable_statuses for t in todos)
 

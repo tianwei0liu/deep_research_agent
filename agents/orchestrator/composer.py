@@ -3,13 +3,13 @@ Composer Node: Synthesizes final report from completed tasks.
 """
 
 import logging
-from research_assistant.agents.orchestrator.state import OrchestratorState, TaskStatus
-from research_assistant.agents.orchestrator.prompts import OrchestratorPrompts
-from research_assistant.config import Settings
+from deep_research_agent.agents.orchestrator.state import OrchestratorState, TaskStatus
+from deep_research_agent.agents.orchestrator.prompts import OrchestratorPrompts
+from deep_research_agent.config import Settings
 from google import genai
 from google.genai import types
 from langchain_core.messages import HumanMessage
-from research_assistant.agents.utils.tracing import Tracing
+from deep_research_agent.agents.utils.tracing import Tracing
 
 class Composer:
     """

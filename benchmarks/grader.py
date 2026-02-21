@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 from google import genai
 from google.genai import types
 
-from research_assistant.config import Settings
+from deep_research_agent.config import Settings
 
 
 class BenchmarkGrader:
