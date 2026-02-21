@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "research-assistant"
+version = "0.1.0"
+description = "A multi-agent research system that autonomously conducts deep web research using a Supervisor-Worker architecture built on LangGraph."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "google-genai>=1.0.0",
+    "httpx>=0.27.0",
+    "langgraph>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "langsmith>=0.7.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0",
+    "pytest-asyncio>=1.3",
+]
+
+# Package is the project root (no nested research_assistant/research_assistant/)
+[tool.setuptools.package-dir]
+"research_assistant" = "."
+
+[tool.setuptools.packages]
+packages = ["research_assistant", "research_assistant.config", "research_assistant.agents", "research_assistant.agents.worker", "research_assistant.agents.orchestrator", "research_assistant.agents.utils", "research_assistant.tools"]
+
+[tool.setuptools.package-data]
+research_assistant.config = ["settings.yaml"]

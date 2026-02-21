@@ -1,0 +1,23 @@
+.env
+__pycache__/
+*.pyc
+*.log
+**/data/
+**/model_cache/
+**/qdrant_storage/
+build/
+dist/
+*.egg-info/
+.venv/
+.pytest_cache/
+benchmarks/results/
+examples/final_report.md
+
+# IDE / Editor
+.cursor/
+.agent/
+.gemini/
+
+# OS
+.DS_Store
+Thumbs.db

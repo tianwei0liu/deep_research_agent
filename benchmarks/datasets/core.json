@@ -1,0 +1,113 @@
+[
+  {
+    "id": "factual_001",
+    "category": "factual",
+    "query": "What programming language is the Linux kernel primarily written in, and who originally created it?",
+    "reference_answer": "The Linux kernel is primarily written in C. It was originally created by Linus Torvalds in 1991.",
+    "expected_facets": [
+      "programming language (C)",
+      "creator (Linus Torvalds)",
+      "year of creation"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "id": "factual_002",
+    "category": "factual",
+    "query": "What is Retrieval-Augmented Generation (RAG) and how does it improve LLM responses?",
+    "reference_answer": "RAG is a technique that enhances LLM responses by retrieving relevant external documents and feeding them as context to the model before generation. It reduces hallucinations and provides up-to-date information beyond the model's training data.",
+    "expected_facets": [
+      "definition of RAG",
+      "retrieval step",
+      "augmented generation step",
+      "reduction of hallucinations",
+      "access to external/up-to-date information"
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "id": "temporal_001",
+    "category": "temporal",
+    "query": "What are the major developments in large language models from 2023 to 2025?",
+    "reference_answer": null,
+    "expected_facets": [
+      "GPT-4 or OpenAI developments",
+      "Claude or Anthropic developments",
+      "Gemini or Google developments",
+      "open-source models (Llama, Mistral, etc.)",
+      "key capability improvements (reasoning, multimodal, agents)"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "id": "temporal_002",
+    "category": "temporal",
+    "query": "How has the electric vehicle market evolved in the United States over the last 3 years?",
+    "reference_answer": null,
+    "expected_facets": [
+      "market share or sales trends",
+      "major manufacturers (Tesla, GM, Ford, etc.)",
+      "government policy or incentives",
+      "charging infrastructure",
+      "consumer adoption trends"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "id": "comparative_001",
+    "category": "comparative",
+    "query": "Compare the architectures and key differences between GPT-4, Claude 3.5, and Gemini 1.5 Pro.",
+    "reference_answer": null,
+    "expected_facets": [
+      "GPT-4 architecture or capabilities",
+      "Claude 3.5 architecture or capabilities",
+      "Gemini 1.5 Pro architecture or capabilities",
+      "context window comparison",
+      "strengths and weaknesses comparison"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "id": "comparative_002",
+    "category": "comparative",
+    "query": "Compare LangChain, LlamaIndex, and CrewAI as frameworks for building AI agents.",
+    "reference_answer": null,
+    "expected_facets": [
+      "LangChain features and design philosophy",
+      "LlamaIndex features and design philosophy",
+      "CrewAI features and design philosophy",
+      "use case suitability comparison",
+      "community or ecosystem comparison"
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "id": "multi_hop_001",
+    "category": "multi_hop",
+    "query": "How does Anthropic's multi-agent research system work, and how does its architecture compare to OpenAI's approach to deep research?",
+    "reference_answer": null,
+    "expected_facets": [
+      "Anthropic multi-agent architecture (lead/worker pattern)",
+      "Anthropic memory or context management",
+      "OpenAI deep research approach",
+      "architectural comparison",
+      "trade-offs or design rationale"
+    ],
+    "difficulty": "hard"
+  },
+  {
+    "id": "multi_hop_002",
+    "category": "multi_hop",
+    "query": "What is the FRAMES benchmark, who created it, and how do current RAG systems perform on it compared to standalone LLMs?",
+    "reference_answer": "FRAMES (Factuality, Retrieval, And reasoning MEasurement Set) was created by researchers from Google and Harvard. It consists of 824 multi-hop questions requiring integration of 2-15 Wikipedia articles. Standalone LLMs achieve about 40.8% accuracy, while multi-step retrieval methods improve this to approximately 66%.",
+    "expected_facets": [
+      "FRAMES definition",
+      "creators (Google and Harvard)",
+      "dataset composition (824 questions, multi-hop)",
+      "standalone LLM performance",
+      "RAG-augmented performance",
+      "comparison between the two approaches"
+    ],
+    "difficulty": "hard"
+  }
+]
