@@ -120,7 +120,7 @@ class BenchmarkRunner:
         try:
             async for event in app.astream(
                 initial_state,
-                config={"recursion_limit": recursion_limit},
+                config={"recursion_limit": recursion_limit, "run_name": "Orchestrator"},
             ):
                 for key, value in event.items():
                     turn_count += 1

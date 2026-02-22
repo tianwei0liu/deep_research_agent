@@ -1,11 +1,13 @@
 """
 Tracing utilities for the Deep Research Agent.
-Wraps langsmith.traceable with project-specific defaults.
+
+Provides a bridge between LangGraph's RunnableConfig-based tracing
+and LangSmith's contextvars-based tracing.
 """
 
-import functools
-from typing import Optional, Callable, Any
-from langsmith import traceable as ls_traceable
+from typing import Optional, Any
+
+from langsmith.run_trees import RunTree
 
 
 class Tracing:
@@ -14,28 +16,23 @@ class Tracing:
     """
 
     @staticmethod
-    def trace(
-        name: Optional[str] = None,
-        run_type: str = "chain",
-        **kwargs: Any
-    ) -> Callable:
+    def get_parent_run(config: Optional[dict] = None) -> Optional[RunTree]:
+        """Extract the LangSmith RunTree from a LangGraph RunnableConfig.
+
+        This bridges LangGraph's callback-based tracing to langsmith's
+        contextvars-based tracing. Use the returned RunTree as the
+        ``parent`` argument to ``langsmith.trace()`` so that spans
+        nest under the current LangGraph node.
+
+        Args:
+            config: The RunnableConfig passed to a LangGraph node function.
+
+        Returns:
+            A RunTree if one can be extracted, else None.
         """
-        Decorator to trace a function or method with LangSmith.
-        
-        If name is not provided, it defaults to the qualified name of the function
-        (e.g., "ClassName.method_name" or "function_name").
-        """
-        def decorator(func: Callable) -> Callable:
-            # Determine the name if not provided
-            trace_name = name
-            if not trace_name:
-                # Try to get the qualified name
-                if hasattr(func, "__qualname__"):
-                    trace_name = func.__qualname__
-                else:
-                    trace_name = func.__name__
-            
-            # Apply the langsmith traceable decorator
-            return ls_traceable(name=trace_name, run_type=run_type, **kwargs)(func)
-        
-        return decorator
+        if config is None:
+            return None
+        try:
+            return RunTree.from_runnable_config(config)
+        except Exception:
+            return None

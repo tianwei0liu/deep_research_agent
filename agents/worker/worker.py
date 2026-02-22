@@ -12,10 +12,9 @@ over request/response shapes (Content, Part, function_call).
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 from google import genai
-from deep_research_agent.agents.utils.tracing import Tracing
 
 from deep_research_agent.config import Settings
 from deep_research_agent.agents.worker.schemas import Limits, SpawnTask, WorkerResult
@@ -50,7 +49,6 @@ class Worker:
             self._graph = self._graph_builder.build()
         return self._graph
 
-    @Tracing.trace(name="Worker.run_async")
     async def run_async(
         self,
         task: SpawnTask,
@@ -59,6 +57,7 @@ class Worker:
         *,
         model: str | None = None,
         run_id: str | None = None,
+        parent_config: Optional[dict] = None,
     ) -> WorkerResult:
         """
         Execute the worker: ReAct loop until done or limit reached. Returns envelope (§11.2).
@@ -69,6 +68,10 @@ class Worker:
             tools: Tool names (e.g. ["tavily_search"]). Runner resolves to definitions (§3.3).
             model: Gemini model id (default: gemini-2.5-flash).
             run_id: Optional id for tracing.
+            parent_config: Optional LangGraph RunnableConfig from the
+                           orchestrator. If provided, the worker graph
+                           inherits the parent's callbacks so its trace
+                           nests under the orchestrator's tool_execution_node.
 
         Returns:
             WorkerResult with status, findings, metadata (§4).
@@ -80,14 +83,22 @@ class Worker:
             "model": model,
             "client": self._client,  # Inject client if available
         }
+
+        # Build config for the worker graph.
+        # Propagate callbacks from the orchestrator config so the worker
+        # graph trace chains under the orchestrator's tool_execution_node.
         config: dict[str, Any] = {}
+        if parent_config:
+            callbacks = parent_config.get("callbacks")
+            if callbacks:
+                config["callbacks"] = callbacks
         if run_id:
             config["configurable"] = config.get("configurable") or {}
             config["configurable"]["thread_id"] = run_id
 
         graph = self.get_graph()
         # invoke is sync; ainvoke is async for LangGraph.
-        final_state = await graph.ainvoke(initial, config=config if config else None)
+        final_state = await graph.ainvoke(initial, config=config or None)
         result = final_state.get("result")
         if result is None:
             return WorkerResult(

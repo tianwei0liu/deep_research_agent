@@ -5,7 +5,7 @@ import logging
 from typing import Any, Callable, Literal, Optional
 from pydantic import BaseModel, Field
 import httpx
-from langsmith import traceable
+
 
 from deep_research_agent.config import Settings
 
@@ -148,7 +148,6 @@ class TavilySearchTool:
         logger.debug("tavily_search_async returned %d results for query=%r", len(results), input_data.query[:80])
         return {"results_summary": text, "count": len(results), "query": data.get("query", input_data.query)}
 
-    @traceable(run_type="tool", name="tavily_search")
     def search(
         self,
         **kwargs
@@ -157,7 +156,6 @@ class TavilySearchTool:
         input_data = self.TavilySearchInput(**kwargs)
         return self._search_impl(input_data)
 
-    @traceable(run_type="tool", name="tavily_search")
     async def search_async(
         self,
         **kwargs

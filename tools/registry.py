@@ -79,11 +79,6 @@ class ToolRegistry:
             planning.PlanningTool.make_add_impl
         )
         cls.register(
-            "update_task_status", 
-            planning.PlanningTool.get_update_task_status_declaration(), 
-            planning.PlanningTool.make_update_status_impl
-        )
-        cls.register(
             "remove_task", 
             planning.PlanningTool.get_remove_task_declaration(), 
             planning.PlanningTool.make_remove_impl

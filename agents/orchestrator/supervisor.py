@@ -16,9 +16,10 @@ from typing import List, Any, Optional, Dict, Tuple
 
 from google import genai
 from google.genai import types
-from deep_research_agent.agents.utils.tracing import Tracing
+
 
 from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage, AIMessage, BaseMessage
+from langchain_core.runnables import RunnableConfig
 
 from deep_research_agent.config import Settings
 from deep_research_agent.agents.orchestrator.schemas import TaskStatus
@@ -164,8 +165,7 @@ class Supervisor:
                 
         return AIMessage(content=text_content, tool_calls=tool_calls, additional_kwargs=additional_kwargs)
 
-    @Tracing.trace(run_type="chain")
-    async def run(self, state: OrchestratorState):
+    async def run(self, state: OrchestratorState, config: RunnableConfig):
         """
         The Supervisor Node logic.
         """
@@ -181,7 +181,7 @@ class Supervisor:
             
             # Resolve Tools dynamically
             from deep_research_agent.tools.registry import ToolRegistry
-            tool_names = ["add_task", "update_task_status", "remove_task", "write_file", "delegate_research", "finish"]
+            tool_names = ["add_task", "remove_task", "write_file", "delegate_research", "finish"]
             declarations, _ = ToolRegistry.resolve(tool_names, self.settings)
             
             # Convert declarations to types.Tool
@@ -289,8 +289,7 @@ class Supervisor:
             self.logger.exception("Supervisor Gemini call failed")
             return {"messages": [AIMessage(content=f"Error: {e}")]}
 
-    @Tracing.trace(run_type="chain")
-    async def execute_tools(self, state: OrchestratorState):
+    async def execute_tools(self, state: OrchestratorState, config: RunnableConfig):
         """
         Executes tool calls from the Supervisor using Map-Reduce pattern.
         """
@@ -306,7 +305,7 @@ class Supervisor:
         
         # Resolve tool implementations
         from deep_research_agent.tools.registry import ToolRegistry
-        tool_names = ["add_task", "update_task_status", "remove_task", "write_file", "delegate_research", "finish"]
+        tool_names = ["add_task", "remove_task", "write_file", "delegate_research", "finish"]
         _, impls = ToolRegistry.resolve(tool_names, self.settings)
         
         self.logger.info(f"Executing {len(last_msg.tool_calls)} tools.")
@@ -318,7 +317,7 @@ class Supervisor:
 
         for tool_call in last_msg.tool_calls:
             name = tool_call["name"]
-            if name in ["add_task", "update_task_status", "remove_task"]:
+            if name in ["add_task", "remove_task"]:
                 mutators.append(tool_call)
             elif name == "delegate_research":
                 parallel_workers.append(tool_call)
@@ -345,9 +344,6 @@ class Supervisor:
                      todos = impl(current_todos=todos, **args)
                      added_task = todos[-1]
                      result_str = f"Successfully added task '{added_task.id}': {args.get('objective')}"
-                elif name == "update_task_status":
-                     todos = impl(current_todos=todos, **args)
-                     result_str = f"Successfully executed update_task_status: {args.get('task_id')} -> {args.get('status')}"
                 elif name == "remove_task":
                      todos = impl(current_todos=todos, **args)
                      result_str = f"Successfully executed remove_task: {args.get('task_id')}"
@@ -376,31 +372,34 @@ class Supervisor:
                 from deep_research_agent.tools.delegation import DelegationTool
                 dt = DelegationTool(self.settings)
 
+                # Look up the target task for status tracking and context injection
+                target_task = next((t for t in todos if t.id == args["task_id"]), None)
+
                 # Auto-inject context from completed dependencies
                 context_str = None
-                if name == "delegate_research":
-                    target_task = next((t for t in todos if t.id == args["task_id"]), None)
-                    if target_task and target_task.dependencies:
-                        context_parts = []
-                        for dep_id in target_task.dependencies:
-                            dep_task = next((t for t in todos if t.id == dep_id), None)
-                            if dep_task and dep_task.full_findings:
-                                context_parts.append(
-                                    f"### Result from '{dep_task.objective}':\n{dep_task.full_findings}"
-                                )
-                        if context_parts:
-                            context_str = "\n\n".join(context_parts)
-                            self.logger.info(
-                                f"Injecting context from {len(context_parts)} "
-                                f"dependencies for task {args['task_id']}"
+                if target_task and target_task.dependencies:
+                    context_parts = []
+                    for dep_id in target_task.dependencies:
+                        dep_task = next((t for t in todos if t.id == dep_id), None)
+                        if dep_task and dep_task.full_findings:
+                            context_parts.append(
+                                f"### Result from '{dep_task.objective}':\n{dep_task.full_findings}"
                             )
+                    if context_parts:
+                        context_str = "\n\n".join(context_parts)
+                        self.logger.info(
+                            f"Injecting context from {len(context_parts)} "
+                            f"dependencies for task {args['task_id']}"
+                        )
 
                 findings_dict = await dt.delegate_research(
                     task_id=args["task_id"],
                     objective=args["objective"],
                     instructions=args["instructions"],
                     context=context_str,
-                    limits=worker_limits
+                    limits=worker_limits,
+                    task=target_task,
+                    parent_config=config,
                 )
 
                 return (call_id, findings_dict, args.get("task_id"), None)

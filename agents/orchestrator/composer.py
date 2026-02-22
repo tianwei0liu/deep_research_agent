@@ -9,7 +9,8 @@ from deep_research_agent.config import Settings
 from google import genai
 from google.genai import types
 from langchain_core.messages import HumanMessage
-from deep_research_agent.agents.utils.tracing import Tracing
+from langchain_core.runnables import RunnableConfig
+
 
 class Composer:
     """
@@ -18,8 +19,7 @@ class Composer:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-    @Tracing.trace(run_type="chain")
-    async def run(self, state: OrchestratorState) -> dict:
+    async def run(self, state: OrchestratorState, config: RunnableConfig) -> dict:
         """
         Synthesizes the final answer from completed tasks.
         """

@@ -83,7 +83,7 @@ async def main() -> None:
     recursion_limit = initial_state.get("recursion_limit", 20)
     
     logger.info("--- Starting Execution (Recursion Limit: %d) ---", recursion_limit)
-    async for event in app.astream(initial_state, config={"recursion_limit": recursion_limit}):
+    async for event in app.astream(initial_state, config={"recursion_limit": recursion_limit, "run_name": "Orchestrator"}):
         for key, value in event.items():
             logger.info("[Node: %s]", key)
             # Log simple summary of updates
@@ -100,7 +100,7 @@ async def main() -> None:
             if "todos" in value:
                 logger.info("  Todos Count: %d", len(value['todos']))
                 for t in value["todos"]:
-                    result_len = len(t.result) if t.result else 0
+                    result_len = len(t.full_findings) if t.full_findings else 0
                     logger.info("    - [%s] %s (Result len: %d)", t.status.value, t.objective, result_len)
             
             if "final_report" in value:

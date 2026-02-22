@@ -68,7 +68,7 @@ async def test_parallel_workers_execute_concurrently(supervisor):
     state = _make_state(tool_calls, todos=todos)
 
     # Mock: each delegate_research sleeps 1 second then returns findings
-    async def mock_delegate(self, task_id, objective, instructions, context=None, limits=None):
+    async def mock_delegate(self, task_id, objective, instructions, context=None, limits=None, task=None, parent_config=None):
         await asyncio.sleep(1.0)
         return {
             "status": "completed",
@@ -82,7 +82,7 @@ async def test_parallel_workers_execute_concurrently(supervisor):
         mock_delegate,
     ):
         start = time.monotonic()
-        result = await supervisor.execute_tools(state)
+        result = await supervisor.execute_tools(state, {})
         elapsed = time.monotonic() - start
 
     # Assert: parallel → should take ~1s, NOT ~3s
@@ -111,7 +111,7 @@ async def test_sequential_mutators_execute_in_order(supervisor):
 
     state = _make_state(tool_calls)
 
-    result = await supervisor.execute_tools(state)
+    result = await supervisor.execute_tools(state, {})
 
     # Assert: 3 todos in correct order
     todos = result["todos"]
@@ -142,7 +142,7 @@ async def test_add_task_with_custom_id(supervisor):
     ]
 
     state = _make_state(tool_calls)
-    result = await supervisor.execute_tools(state)
+    result = await supervisor.execute_tools(state, {})
 
     todos = result["todos"]
     assert len(todos) == 1
@@ -167,7 +167,7 @@ async def test_add_task_with_dependencies(supervisor):
     ]
 
     state = _make_state(tool_calls)
-    result = await supervisor.execute_tools(state)
+    result = await supervisor.execute_tools(state, {})
 
     todos = result["todos"]
     assert len(todos) == 2
@@ -198,7 +198,7 @@ async def test_supervisor_injects_context_from_dependencies(supervisor):
 
     captured_context = {}
 
-    async def mock_delegate(self, task_id, objective, instructions, context=None, limits=None):
+    async def mock_delegate(self, task_id, objective, instructions, context=None, limits=None, task=None, parent_config=None):
         captured_context["context"] = context
         return {
             "status": "completed",
@@ -211,12 +211,16 @@ async def test_supervisor_injects_context_from_dependencies(supervisor):
         "deep_research_agent.tools.delegation.DelegationTool.delegate_research",
         mock_delegate,
     ):
-        await supervisor.execute_tools(state)
+        result = await supervisor.execute_tools(state, {})
 
     # Assert: context was injected with T1's result
     assert captured_context["context"] is not None
     assert "Today is Feb 2026" in captured_context["context"]
     assert "Find date" in captured_context["context"]
+
+    # Assert: T2 ends up COMPLETED after delegation
+    t2_final = next(t for t in result["todos"] if t.id == "T2")
+    assert t2_final.status == TaskStatus.COMPLETED
 
 
 # ---------------------------------------------------------------------------
@@ -238,7 +242,7 @@ async def test_no_context_for_independent_tasks(supervisor):
 
     captured_context = {}
 
-    async def mock_delegate(self, task_id, objective, instructions, context=None, limits=None):
+    async def mock_delegate(self, task_id, objective, instructions, context=None, limits=None, task=None, parent_config=None):
         captured_context["context"] = context
         return {
             "status": "completed",
@@ -251,7 +255,58 @@ async def test_no_context_for_independent_tasks(supervisor):
         "deep_research_agent.tools.delegation.DelegationTool.delegate_research",
         mock_delegate,
     ):
-        await supervisor.execute_tools(state)
+        result = await supervisor.execute_tools(state, {})
 
     # Assert: no context injected
     assert captured_context["context"] is None
+
+    # Assert: T1 ends up COMPLETED after delegation
+    t1_final = next(t for t in result["todos"] if t.id == "T1")
+    assert t1_final.status == TaskStatus.COMPLETED
+
+
+# ---------------------------------------------------------------------------
+# TEST 7: Task status is set to RUNNING during delegation
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_task_status_set_to_running_during_delegation(supervisor):
+    """Task status should be RUNNING while the worker is executing."""
+    t1 = ResearchTask(id="T1", objective="Test", description="desc")
+    assert t1.status == TaskStatus.PENDING
+
+    tool_calls = [
+        {"id": "call_1", "name": "delegate_research",
+         "args": {"task_id": "T1", "objective": "Test", "instructions": "instr"}}
+    ]
+
+    state = _make_state(tool_calls, todos=[t1])
+
+    captured_status = {}
+
+    # Mock at Worker.run_async level so the real delegate_research body executes
+    # (which sets task.status = RUNNING), but actual worker execution is faked.
+    from deep_research_agent.agents.worker.schemas import WorkerResult
+
+    async def mock_worker_run(self_worker, task, limits, tools, **kwargs):
+        # At this point, delegate_research should have already set RUNNING
+        captured_status["during"] = t1.status
+        return WorkerResult(
+            status=TaskStatus.COMPLETED,
+            brief_summary="Done",
+            full_findings="Findings",
+            metadata={},
+        )
+
+    with patch(
+        "deep_research_agent.agents.worker.worker.Worker.run_async",
+        mock_worker_run,
+    ):
+        result = await supervisor.execute_tools(state, {})
+
+    # During worker execution: RUNNING
+    assert captured_status["during"] == TaskStatus.RUNNING
+
+    # After delegation: COMPLETED
+    t1_final = next(t for t in result["todos"] if t.id == "T1")
+    assert t1_final.status == TaskStatus.COMPLETED

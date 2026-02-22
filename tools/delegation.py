@@ -3,11 +3,12 @@ Delegation tools: Spawn worker agents for research tasks.
 """
 
 import logging
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 from pydantic import BaseModel, Field
 
 from deep_research_agent.config import Settings
 from deep_research_agent.agents.worker.schemas import SpawnTask, Limits, WorkerResult
+from deep_research_agent.agents.orchestrator.schemas import ResearchTask, TaskStatus
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,16 @@ class DelegationTool:
         instructions: str = Field(..., description="Detailed research instructions/boundaries.")
 
     # --- Actions ---
-    async def delegate_research(self, task_id: str, objective: str, instructions: str, context: str | None = None, limits: Limits = None) -> dict[str, Any]:
+    async def delegate_research(
+        self,
+        task_id: str,
+        objective: str,
+        instructions: str,
+        context: str | None = None,
+        limits: Limits = None,
+        task: Optional[ResearchTask] = None,
+        parent_config: Optional[dict] = None,
+    ) -> dict[str, Any]:
         """
         Executes a worker for the given task.
         Returns a dictionary containing the findings.
@@ -34,7 +44,16 @@ class DelegationTool:
         Args:
             context: Optional context from completed dependency tasks,
                      injected by the Supervisor (not the LLM).
+            task: Optional ResearchTask object. If provided, its status is
+                  automatically set to RUNNING before the worker starts.
+            parent_config: Optional LangGraph RunnableConfig from the
+                           orchestrator for trace chaining.
         """
+        # Mark task as RUNNING before spawning the worker
+        if task is not None:
+            task.status = TaskStatus.RUNNING
+            logger.info(f"Task {task_id} status set to RUNNING")
+
         logger.info(f"Delegating research for task {task_id}: {objective}")
         
         # Lazy import to avoid circular dependency
@@ -64,7 +83,8 @@ class DelegationTool:
             result: WorkerResult = await worker.run_async(
                 task=spawn_task,
                 limits=limits,
-                tools=["tavily_search"] 
+                tools=["tavily_search"],
+                parent_config=parent_config,
             )
             
             return {

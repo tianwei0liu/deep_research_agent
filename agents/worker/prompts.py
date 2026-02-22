@@ -1,6 +1,6 @@
 """System and task prompts for the worker (§8)."""
 
-from langsmith import traceable
+
 
 from deep_research_agent.agents.worker.schemas import Limits, SpawnTask
 
@@ -9,7 +9,6 @@ class WorkerPrompts:
     """Encapsulates system and task prompt building for the worker (§8)."""
 
     @staticmethod
-    @traceable(run_type="prompt", name="build_static_system_prompt")
     def build_static_system_prompt() -> str:
         """
         §8.1: Static System Prompt (Role & Protocol).
@@ -52,7 +51,6 @@ You are an expert research worker. Think like a human researcher with limited ti
 """
 
     @staticmethod
-    @traceable(run_type="prompt", name="build_task_instructions")
     def build_task_instructions(
         task: SpawnTask,
         limits: Limits,

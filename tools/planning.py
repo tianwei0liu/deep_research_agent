@@ -29,12 +29,10 @@ class PlanningTool:
     class UpdateTaskStatusInput(BaseModel):
         """Input for updating the status of an existing task."""
         task_id: str = Field(..., description="ID of the task to update.")
-        status: Literal["pending", "running", "completed", "failed", "partial"] = Field(
+        status: Literal["completed", "failed", "partial"] = Field(
             ...,
             description=(
-                "The new status of the task. "
-                "'pending': waiting to be executed. "
-                "'running': currently being executed. "
+                "The new terminal status of the task. "
                 "'completed': finished successfully. "
                 "'failed': encountered an error. "
                 "'partial': finished but reached limits before fully completing its objective."
@@ -129,7 +127,7 @@ class PlanningTool:
             status = TaskStatus(input_data.status)
             return tool.update_task_status(current_todos, input_data.task_id, status)
         return impl
-
+    
     @staticmethod
     def make_remove_impl(settings: Settings) -> Callable:
         tool = PlanningTool(settings)

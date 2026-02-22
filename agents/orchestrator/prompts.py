@@ -3,7 +3,7 @@ Prompts for the Orchestrator (Supervisor and Composer).
 """
 
 from typing import List
-from deep_research_agent.agents.utils.tracing import Tracing
+
 from deep_research_agent.agents.orchestrator.state import ResearchTask
 
 class OrchestratorPrompts:
@@ -110,8 +110,7 @@ The worker failed to find "launched specs" because the premise was wrong (the ca
 
 **Tool Calls**:
 ```python
-# 1. Update status of completed task (optional, but good for tracking)
-# 2. Add a new task to get definitive proof of cancellation.
+# Add a new task to get definitive proof of cancellation.
 add_task(objective="Verify Apple Car Project Cancellation", description="The previous search suggested the car was cancelled. Find authoritative sources confirming the cancellation of Project Titan and the date it happened.")
 ```
 
@@ -175,11 +174,10 @@ delegate_research(task_id="T3", objective="...", instructions="...")
 """
 
     @classmethod
-    @Tracing.trace(run_type="prompt", name="build_supervisor_prompt")
     def build_supervisor_prompt(cls) -> str:
         """
         System prompt for the Dynamic Supervisor.
-        # Cache buster: 4
+        # Cache buster: 5
         """
         return f"""You are a Research Supervisor. Your goal is to answer the user's request by coordinating a team of research workers.
 
@@ -217,7 +215,6 @@ delegate_research(task_id="T3", objective="...", instructions="...")
 """
 
     @staticmethod
-    @Tracing.trace(run_type="prompt", name="build_composer_prompt")
     def build_composer_prompt(user_query: str, tasks: List[ResearchTask]) -> str:
         """
         Prompt for the Composer to synthesize the final report.

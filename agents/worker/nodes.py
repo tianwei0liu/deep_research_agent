@@ -13,8 +13,11 @@ import uuid
 from google import genai
 from google.genai import types
 from langsmith import trace
+from langsmith.run_trees import RunTree
 
+from langchain_core.runnables import RunnableConfig
 from deep_research_agent.agents.utils.tracing import Tracing
+
 from deep_research_agent.agents.utils.cache_manager import get_process_level_cache
 
 from deep_research_agent.config import Settings
@@ -48,12 +51,14 @@ class WorkerNodes:
         model_id: str,
         contents: list[types.Content],
         config: types.GenerateContentConfig,
+        parent_run: RunTree | None = None,
     ) -> types.GenerateContentResponse:
         """Call Gemini generate_content async and record an LLM span in LangSmith."""
         with trace(
             "gemini_generate_content",
             run_type="llm",
             inputs={"model": model_id, "num_contents": len(contents)},
+            parent=parent_run,
         ) as run:
             # Use the async client (aio)
             response = await client.aio.models.generate_content(
@@ -109,7 +114,6 @@ class WorkerNodes:
                 break
         return text
 
-    @Tracing.trace(name="Worker._parse_final_response", run_type="parser")
     def _parse_final_response(
         self,
         response: Any,
@@ -233,8 +237,7 @@ class WorkerNodes:
             },
         )
 
-    @Tracing.trace(name="Worker.validate_and_init")
-    async def validate_and_init(self, state: WorkerState) -> dict[str, Any]:
+    async def validate_and_init(self, state: WorkerState, config: RunnableConfig) -> dict[str, Any]:
         """§12: Validate spawn input; on success init Gemini config and contents; on failure set result."""
         task = state.get("task")
         limits = state.get("limits")
@@ -406,9 +409,10 @@ class WorkerNodes:
             "partial_reason": None,
         }
 
-    @Tracing.trace(name="Worker.reason_act")
-    async def reason_act(self, state: WorkerState) -> dict[str, Any]:
+    async def reason_act(self, state: WorkerState, config: RunnableConfig) -> dict[str, Any]:
         """§5: One ReAct turn: optionally inject limit message, call Gemini, store response and function_calls."""
+        # Bridge LangGraph config → langsmith parent so LLM spans nest under this node
+        parent_run = Tracing.get_parent_run(config)
         contents = state["contents"]
         limits = state["limits"]
         tool_calls_used = state["tool_calls_used"]
@@ -433,7 +437,7 @@ class WorkerNodes:
             )
             try:
                 response = await self._generate_content_traced(
-                    client, model_id, new_contents, config
+                    client, model_id, new_contents, config, parent_run=parent_run
                 )
             except Exception as e:
                 return {
@@ -470,7 +474,7 @@ class WorkerNodes:
         for attempt in range(max_retries):
             try:
                 response = await self._generate_content_traced(
-                    client, model_id, contents, config
+                    client, model_id, contents, config, parent_run=parent_run
                 )
                 
                 # Check for empty content with specific finish reasons
@@ -542,7 +546,7 @@ class WorkerNodes:
             )
             try:
                 summary_response = await self._generate_content_traced(
-                    client, model_id, summary_contents, config
+                    client, model_id, summary_contents, config, parent_run=parent_run
                 )
             except Exception as e:
                 logger.warning(
@@ -599,9 +603,10 @@ class WorkerNodes:
             "partial_reason": None,
         }
 
-    @Tracing.trace(name="Worker.execute_tools")
-    async def execute_tools(self, state: WorkerState) -> dict[str, Any]:
+    async def execute_tools(self, state: WorkerState, config: RunnableConfig) -> dict[str, Any]:
         """§5.1: Run tool batch, append results to contents; enforce remaining budget and optional forced final round."""
+        # Bridge LangGraph config → langsmith parent so tool spans nest under this node
+        parent_run = Tracing.get_parent_run(config)
         contents = state["contents"]
         limits = state["limits"]
         tool_calls_used = state["tool_calls_used"]
@@ -624,20 +629,21 @@ class WorkerNodes:
             logger.debug("Tool Call: %s(args=%s)", name, args)
             impl = impls.get(name)
             
-            async def run_tool(name: str, args: dict[str, Any], impl: Any) -> Any:
+            async def run_tool(name: str, args: dict[str, Any], impl: Any, parent: RunTree | None = None) -> Any:
                 if impl is None:
                     logger.warning("Unknown tool requested: %s", name)
                     return {"error": f"Unknown tool: {name}"}
                 try:
-                    if inspect.iscoroutinefunction(impl):
-                        return await impl(**args)
-                    else:
-                        return await asyncio.to_thread(impl, **args)
+                    with trace(name, run_type="tool", inputs=args, parent=parent):
+                        if inspect.iscoroutinefunction(impl):
+                            return await impl(**args)
+                        else:
+                            return await asyncio.to_thread(impl, **args)
                 except Exception as e:
                     logger.warning("Tool %s failed: %s", name, e)
                     return {"error": str(e)}
 
-            tasks.append(run_tool(name, args, impl))
+            tasks.append(run_tool(name, args, impl, parent=parent_run))
             used += 1
 
         # Execute all tools in parallel
@@ -676,7 +682,7 @@ class WorkerNodes:
             turns = state["turns"]
             try:
                 response = await self._generate_content_traced(
-                    client, model_id, new_contents, config
+                    client, model_id, new_contents, config, parent_run=parent_run
                 )
             except Exception as e:
                 return {
@@ -725,8 +731,7 @@ class WorkerNodes:
             "last_function_calls": [],
         }
 
-    @Tracing.trace(name="Worker.parse_final")
-    async def parse_final(self, state: WorkerState) -> dict[str, Any]:
+    async def parse_final(self, state: WorkerState, config: RunnableConfig) -> dict[str, Any]:
         """§4: Build WorkerResult from last_response / contents and set result."""
         response = state.get("last_response")
         tool_calls_used = state["tool_calls_used"] or 0
