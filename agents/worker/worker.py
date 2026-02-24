@@ -85,20 +85,17 @@ class Worker:
         }
 
         # Build config for the worker graph.
-        # Propagate callbacks from the orchestrator config so the worker
-        # graph trace chains under the orchestrator's tool_execution_node.
-        config: dict[str, Any] = {}
-        if parent_config:
-            callbacks = parent_config.get("callbacks")
-            if callbacks:
-                config["callbacks"] = callbacks
+        # Propagate the full parent RunnableConfig so the worker graph
+        # trace properly nests under the orchestrator's tool_execution_node.
+        worker_config: dict[str, Any] = dict(parent_config) if parent_config else {}
+        worker_config["run_name"] = f"Worker:{task.objective[:50]}"
         if run_id:
-            config["configurable"] = config.get("configurable") or {}
-            config["configurable"]["thread_id"] = run_id
+            worker_config["configurable"] = worker_config.get("configurable") or {}
+            worker_config["configurable"]["thread_id"] = run_id
 
         graph = self.get_graph()
         # invoke is sync; ainvoke is async for LangGraph.
-        final_state = await graph.ainvoke(initial, config=config or None)
+        final_state = await graph.ainvoke(initial, config=worker_config or None)
         result = final_state.get("result")
         if result is None:
             return WorkerResult(

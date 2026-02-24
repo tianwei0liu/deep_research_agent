@@ -14,12 +14,15 @@ import uuid
 import inspect
 from typing import List, Any, Optional, Dict, Tuple
 
+from langsmith import trace as ls_trace
+
 from google import genai
 from google.genai import types
 
 
 from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage, AIMessage, BaseMessage
 from langchain_core.runnables import RunnableConfig
+from deep_research_agent.agents.utils.tracing import Tracing
 
 from deep_research_agent.config import Settings
 from deep_research_agent.agents.orchestrator.schemas import TaskStatus
@@ -165,7 +168,7 @@ class Supervisor:
                 
         return AIMessage(content=text_content, tool_calls=tool_calls, additional_kwargs=additional_kwargs)
 
-    async def run(self, state: OrchestratorState, config: RunnableConfig):
+    async def run(self, state: OrchestratorState, config: RunnableConfig):  # noqa: C901
         """
         The Supervisor Node logic.
         """
@@ -215,9 +218,11 @@ class Supervisor:
             
             # DYNAMIC: The Limits
             # Calculate current step by counting previous supervisor AIMessages
-            current_step = sum(1 for m in messages if isinstance(m, AIMessage)) + 1
+            # Each full cycle (Supervisor + Tool Node) consumes essentially 2 LangGraph steps.
+            current_graph_step = (sum(1 for m in messages if isinstance(m, AIMessage)) * 2) + 1 
             max_steps = state.get("recursion_limit", self.settings.default_recursion_limit)
-            dynamic_limits_str = OrchestratorPrompts.build_dynamic_limits_prompt(current_step, max_steps)
+            
+            dynamic_limits_str = OrchestratorPrompts.build_dynamic_limits_prompt(current_graph_step, max_steps)
 
             # INJECT TODOS AND LIMITS
             state_text = f"--- DYNAMIC CONSTRAINTS ---\n{dynamic_limits_str}\n\n--- ORCHESTRATOR STATE ---\n{todo_list_str}\n--------------------------\nPlease proceed with the next step."
@@ -258,14 +263,14 @@ class Supervisor:
             
             if cached_name:
                 self.logger.info(f"Using Cached Content: {cached_name}")
-                config = types.GenerateContentConfig(
+                gemini_config = types.GenerateContentConfig(
                     cached_content=cached_name,
                     temperature=0.0,
                     thinking_config=types.ThinkingConfig(thinking_level=self.settings.supervisor_thinking_level)
                 )
             else:
                 self.logger.info("Cache miss or disabled. Using standard context.")
-                config = types.GenerateContentConfig(
+                gemini_config = types.GenerateContentConfig(
                     system_instruction=system_prompt_text,
                     tools=[gemini_tools],
                     temperature=0.0,
@@ -273,11 +278,53 @@ class Supervisor:
                     thinking_config=types.ThinkingConfig(thinking_level=self.settings.supervisor_thinking_level)
                 )
             
-            response = await client.aio.models.generate_content(
-                model=model_id,
-                contents=contents,
-                config=config
-            )
+            # Trace the LLM call so it appears in LangSmith
+            # Extract parent run BEFORE config shadowing (config is the
+            # RunnableConfig from LangGraph, not the Gemini config).
+            parent_run = Tracing.get_parent_run(config)
+            with ls_trace(
+                "gemini_generate_content",
+                run_type="llm",
+                inputs={"model": model_id, "num_contents": len(contents)},
+                parent=parent_run,
+            ) as run:
+                response = await client.aio.models.generate_content(
+                    model=model_id,
+                    contents=contents,
+                    config=gemini_config
+                )
+                # Build rich output summary for LangSmith visibility
+                span_outputs: dict = {"has_candidates": bool(response.candidates)}
+                candidate = response.candidates[0] if response.candidates else None
+                if candidate:
+                    finish_reason = getattr(candidate, "finish_reason", None)
+                    if finish_reason is not None:
+                        span_outputs["finish_reason"] = str(finish_reason)
+                    c_content = getattr(candidate, "content", None)
+                    c_parts = c_content.parts if c_content and c_content.parts else []
+                    span_outputs["num_parts"] = len(c_parts)
+                    text_parts = []
+                    fc_list = []
+                    for p in c_parts:
+                        if hasattr(p, "text") and p.text:
+                            text_parts.append(p.text)
+                        if getattr(p, "function_call", None):
+                            fc = p.function_call
+                            fc_info = {"name": fc.name}
+                            if fc.args:
+                                fc_info["args"] = dict(fc.args)
+                            fc_list.append(fc_info)
+                    if text_parts:
+                        full_text = "\n".join(text_parts)
+                        span_outputs["text"] = full_text[:2000] + ("..." if len(full_text) > 2000 else "")
+                    if fc_list:
+                        span_outputs["function_calls"] = fc_list
+                usage = getattr(response, "usage_metadata", None)
+                if usage:
+                    span_outputs["prompt_tokens"] = int(getattr(usage, "prompt_token_count", 0) or 0)
+                    span_outputs["candidates_tokens"] = int(getattr(usage, "candidates_token_count", 0) or 0)
+                    span_outputs["total_tokens"] = int(getattr(usage, "total_token_count", 0) or 0)
+                run.end(outputs=span_outputs)
 
             # CONVERT BACK
             ai_msg = self._convert_genai_response_to_langchain(response)

@@ -45,6 +45,53 @@ class WorkerNodes:
         api_key = self._settings.require_gemini_api_key()
         return genai.Client(api_key=api_key)
 
+    @staticmethod
+    def _extract_response_summary(response: Any, max_text_len: int = 2000) -> dict[str, Any]:
+        """Extract a human-readable summary from a Gemini response for tracing."""
+        summary: dict[str, Any] = {"has_candidates": bool(response.candidates)}
+
+        candidate = response.candidates[0] if response.candidates else None
+        if not candidate:
+            return summary
+
+        # Finish reason
+        finish_reason = getattr(candidate, "finish_reason", None)
+        if finish_reason is not None:
+            summary["finish_reason"] = str(finish_reason)
+
+        # Parts breakdown
+        content = getattr(candidate, "content", None)
+        parts = content.parts if content and content.parts else []
+        summary["num_parts"] = len(parts)
+
+        # Text content (truncated)
+        text_parts = []
+        function_calls = []
+        for p in parts:
+            if hasattr(p, "text") and p.text:
+                text_parts.append(p.text)
+            if getattr(p, "function_call", None):
+                fc = p.function_call
+                fc_info = {"name": fc.name}
+                if fc.args:
+                    fc_info["args"] = dict(fc.args)
+                function_calls.append(fc_info)
+
+        if text_parts:
+            full_text = "\n".join(text_parts)
+            summary["text"] = full_text[:max_text_len] + ("..." if len(full_text) > max_text_len else "")
+        if function_calls:
+            summary["function_calls"] = function_calls
+
+        # Token counts
+        usage = getattr(response, "usage_metadata", None)
+        if usage:
+            summary["prompt_tokens"] = int(getattr(usage, "prompt_token_count", 0) or 0)
+            summary["candidates_tokens"] = int(getattr(usage, "candidates_token_count", 0) or 0)
+            summary["total_tokens"] = int(getattr(usage, "total_token_count", 0) or 0)
+
+        return summary
+
     async def _generate_content_traced(
         self,
         client: genai.Client,
@@ -64,18 +111,7 @@ class WorkerNodes:
             response = await client.aio.models.generate_content(
                 model=model_id, contents=contents, config=config
             )
-            run.end(
-                outputs={
-                    "has_candidates": bool(response.candidates),
-                    "num_parts": (
-                        len(response.candidates[0].content.parts)
-                        if response.candidates
-                        and getattr(response.candidates[0], "content", None)
-                        and response.candidates[0].content.parts
-                        else 0
-                    ),
-                },
-            )
+            run.end(outputs=self._extract_response_summary(response))
         return response
 
     @staticmethod
@@ -421,7 +457,7 @@ class WorkerNodes:
         turns = state["turns"] + 1
         client = state["client"]
         model_id = state["model_id"]
-        config = state["gemini_config"]
+        gemini_config = state["gemini_config"]
 
         if limits.max_turns is not None and turns > limits.max_turns:
             new_contents = list(contents)
@@ -437,7 +473,7 @@ class WorkerNodes:
             )
             try:
                 response = await self._generate_content_traced(
-                    client, model_id, new_contents, config, parent_run=parent_run
+                    client, model_id, new_contents, gemini_config, parent_run=parent_run
                 )
             except Exception as e:
                 return {
@@ -474,7 +510,7 @@ class WorkerNodes:
         for attempt in range(max_retries):
             try:
                 response = await self._generate_content_traced(
-                    client, model_id, contents, config, parent_run=parent_run
+                    client, model_id, contents, gemini_config, parent_run=parent_run
                 )
                 
                 # Check for empty content with specific finish reasons
@@ -546,7 +582,7 @@ class WorkerNodes:
             )
             try:
                 summary_response = await self._generate_content_traced(
-                    client, model_id, summary_contents, config, parent_run=parent_run
+                    client, model_id, summary_contents, gemini_config, parent_run=parent_run
                 )
             except Exception as e:
                 logger.warning(
@@ -634,11 +670,17 @@ class WorkerNodes:
                     logger.warning("Unknown tool requested: %s", name)
                     return {"error": f"Unknown tool: {name}"}
                 try:
-                    with trace(name, run_type="tool", inputs=args, parent=parent):
+                    with trace(name, run_type="tool", inputs=args, parent=parent) as tool_run:
                         if inspect.iscoroutinefunction(impl):
-                            return await impl(**args)
+                            result = await impl(**args)
                         else:
-                            return await asyncio.to_thread(impl, **args)
+                            result = await asyncio.to_thread(impl, **args)
+                        # Log tool output (truncate large results to keep spans readable)
+                        result_str = str(result)
+                        tool_run.end(outputs={
+                            "result": result_str[:3000] + ("..." if len(result_str) > 3000 else ""),
+                        })
+                        return result
                 except Exception as e:
                     logger.warning("Tool %s failed: %s", name, e)
                     return {"error": str(e)}
@@ -678,11 +720,11 @@ class WorkerNodes:
         if need_forced_final:
             client = state["client"]
             model_id = state["model_id"]
-            config = state["gemini_config"]
+            gemini_config = state["gemini_config"]
             turns = state["turns"]
             try:
                 response = await self._generate_content_traced(
-                    client, model_id, new_contents, config, parent_run=parent_run
+                    client, model_id, new_contents, gemini_config, parent_run=parent_run
                 )
             except Exception as e:
                 return {

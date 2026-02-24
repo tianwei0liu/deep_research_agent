@@ -3,8 +3,12 @@ Composer Node: Synthesizes final report from completed tasks.
 """
 
 import logging
+
+from langsmith import trace as ls_trace
+
 from deep_research_agent.agents.orchestrator.state import OrchestratorState, TaskStatus
 from deep_research_agent.agents.orchestrator.prompts import OrchestratorPrompts
+from deep_research_agent.agents.utils.tracing import Tracing
 from deep_research_agent.config import Settings
 from google import genai
 from google.genai import types
@@ -54,14 +58,27 @@ class Composer:
 
         # Use native Gemini for composer as before
         try:
-            response = await client.aio.models.generate_content(
-                model=model_id,
-                contents=[types.Content(role="user", parts=[types.Part.from_text(text=prompt)])],
-                config=types.GenerateContentConfig(
-                    temperature=settings.composer_temperature,
-                    thinking_config=types.ThinkingConfig(thinking_level=settings.composer_thinking_level)
+            parent_run = Tracing.get_parent_run(config)
+            with ls_trace(
+                "gemini_generate_content",
+                run_type="llm",
+                inputs={"model": model_id, "query_preview": user_query[:100]},
+                parent=parent_run,
+            ) as run:
+                response = await client.aio.models.generate_content(
+                    model=model_id,
+                    contents=[types.Content(role="user", parts=[types.Part.from_text(text=prompt)])],
+                    config=types.GenerateContentConfig(
+                        temperature=settings.composer_temperature,
+                        thinking_config=types.ThinkingConfig(thinking_level=settings.composer_thinking_level)
+                    )
                 )
-            )
+                run.end(
+                    outputs={
+                        "has_candidates": bool(response.candidates),
+                        "report_length": len(response.candidates[0].content.parts[0].text) if response.candidates else 0,
+                    },
+                )
             
             final_report = response.candidates[0].content.parts[0].text
             self.logger.info("Composer generated final report.")
