@@ -38,6 +38,7 @@ class Settings:
     worker_thinking_level: str
     composer_thinking_level: str
     grader_thinking_level: str
+    grader_google_search_enabled: bool
 
     def require_gemini_api_key(self) -> str:
         if not self.gemini_api_key:
@@ -114,6 +115,7 @@ class Settings:
             worker_thinking_level=yaml_data.get("worker_thinking_level", "medium"),
             composer_thinking_level=yaml_data.get("composer_thinking_level", "medium"),
             grader_thinking_level=yaml_data.get("grader_thinking_level", "medium"),
+            grader_google_search_enabled=bool(yaml_data.get("grader_google_search_enabled", True)),
             # Default Limits
             default_max_parallel_workers=int(yaml_data.get("default_max_parallel_workers", 10)),
             default_recursion_limit=int(yaml_data.get("default_recursion_limit", 25)),

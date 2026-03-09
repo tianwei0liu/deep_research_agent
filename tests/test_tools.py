@@ -32,6 +32,7 @@ async def test_tavily_search_async():
         worker_thinking_level="medium",
         composer_thinking_level="medium",
         grader_thinking_level="medium",
+        grader_google_search_enabled=True,
     )
     tool = TavilySearchTool(settings)
 

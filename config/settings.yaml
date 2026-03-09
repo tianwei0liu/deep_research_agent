@@ -20,6 +20,7 @@ supervisor_thinking_level: "high"
 worker_thinking_level: "medium"
 composer_thinking_level: "medium"
 grader_thinking_level: "medium"
+grader_google_search_enabled: true
 
 # LangSmith / LangChain (tracing); SDK reads from environment — we set these from YAML at load time
 langchain:

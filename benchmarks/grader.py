@@ -7,6 +7,7 @@ citation quality, and decomposition quality.
 import json
 import logging
 import re
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from google import genai
@@ -41,7 +42,10 @@ Evaluate the report on four dimensions. For each, give a score from 0.0 to 1.0.
 - 0.7: Mostly accurate with minor errors or imprecisions.
 - 0.4: Contains some correct information but also notable inaccuracies.
 - 0.0: Largely incorrect or fabricated information.
-If no reference answer is provided, evaluate based on internal consistency and plausibility.
+If no reference answer is provided, use the google_search tool to verify key factual claims
+before scoring. If a claim cannot be verified through search, mark it as "unverifiable" in
+your reasoning rather than assuming it is a hallucination. Only penalize claims that are
+demonstrably false based on search results.
 
 ### Completeness (0.0–1.0)
 - 1.0: All expected facets are covered with meaningful depth.
@@ -110,6 +114,20 @@ You MUST return ONLY valid JSON (no markdown fences, no extra text) with this sc
 
         self.logger.info("Grading report for query: %s", query[:80])
 
+        # Inject current date so the Judge knows its parametric knowledge may be stale.
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        system_prompt = (
+            f"Today's date is {today}. Your training data may not include events "
+            "after your knowledge cutoff. Use the google_search tool to verify "
+            "any facts you are uncertain about before scoring.\n\n"
+            + self._GRADER_SYSTEM_PROMPT
+        )
+
+        # Enable Google Search grounding so the Judge can verify facts in real time.
+        tools = None
+        if self._settings.grader_google_search_enabled:
+            tools = [types.Tool(google_search=types.GoogleSearch())]
+
         response = await client.aio.models.generate_content(
             model=model_id,
             contents=[
@@ -119,14 +137,37 @@ You MUST return ONLY valid JSON (no markdown fences, no extra text) with this sc
                 )
             ],
             config=types.GenerateContentConfig(
-                system_instruction=self._GRADER_SYSTEM_PROMPT,
+                system_instruction=system_prompt,
                 temperature=self._settings.grader_temperature,
                 thinking_config=types.ThinkingConfig(thinking_level=self._settings.grader_thinking_level),
+                tools=tools,
             ),
         )
 
-        raw_text = response.candidates[0].content.parts[0].text
+        raw_text = self._extract_text(response)
         return self._parse_grader_response(raw_text)
+
+    @staticmethod
+    def _extract_text(response: types.GenerateContentResponse) -> str:
+        """Extract the model's text output, skipping any thinking parts.
+
+        When thinking is enabled, parts[0] is the thought and the actual
+        text response comes in a subsequent part.  This method finds the
+        first non-thought text part.
+
+        Args:
+            response: The raw Gemini API response.
+
+        Returns:
+            The text content of the model's response.
+        """
+        for part in response.candidates[0].content.parts:
+            if part.thought:  # Skip thinking parts
+                continue
+            if part.text is not None:
+                return part.text
+        # Fallback: return whatever is in parts[0]
+        return response.candidates[0].content.parts[0].text
 
     @staticmethod
     def _build_user_prompt(
