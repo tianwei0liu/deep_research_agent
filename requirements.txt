@@ -5,3 +5,7 @@ langgraph>=1.0.0
 python-dotenv>=1.0.0
 langsmith>=0.7.0
 pyyaml>=6.0
+
+# Deep Agent (create_deep_agents)
+deepagents @ git+https://github.com/langchain-ai/deepagents.git#subdirectory=libs/deepagents
+tavily-python
