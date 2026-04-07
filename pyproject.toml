@@ -15,6 +15,8 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "langsmith>=0.7.0",
     "pyyaml>=6.0",
+    "deepagents @ git+https://github.com/langchain-ai/deepagents.git#subdirectory=libs/deepagents",
+    "tavily-python",
 ]
 
 [project.optional-dependencies]
@@ -28,7 +30,7 @@ dev = [
 "deep_research_agent" = "."
 
 [tool.setuptools.packages]
-packages = ["deep_research_agent", "deep_research_agent.config", "deep_research_agent.agents", "deep_research_agent.agents.worker", "deep_research_agent.agents.orchestrator", "deep_research_agent.agents.utils", "deep_research_agent.tools"]
+packages = ["deep_research_agent", "deep_research_agent.config", "deep_research_agent.agents", "deep_research_agent.agents.worker", "deep_research_agent.agents.orchestrator", "deep_research_agent.agents.utils", "deep_research_agent.agents.deep_agent", "deep_research_agent.tools"]
 
 [tool.setuptools.package-data]
 deep_research_agent.config = ["settings.yaml"]

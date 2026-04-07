@@ -1,4 +1,4 @@
-"""Deep Research Agent built with `deepagents.create_deep_agents`.
+"""Deep Research Agent built with `deepagents.create_deep_agent`.
 
 Replicates the project's Supervisor-Worker deep research functionality
 using the official LangGraph `deepagents` library in minimal code.
@@ -44,7 +44,7 @@ def _load_settings() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def _make_internet_search(api_key: str):
-    """Create a Tavily search function compatible with create_deep_agents."""
+    """Create a Tavily search function compatible with create_deep_agent."""
     from tavily import TavilyClient
 
     client = TavilyClient(api_key=api_key)
@@ -214,18 +214,18 @@ def build_deep_agent(**overrides: Any) -> CompiledStateGraph:
     Keyword Args:
         model: Override the main orchestrator model (default: from settings).
         worker_model: Override the worker subagent model (default: from settings).
-        Any other kwarg is forwarded to ``create_deep_agents``.
+        Any other kwarg is forwarded to ``create_deep_agent``.
 
     Returns:
         A compiled LangGraph ``CompiledStateGraph``.
     """
-    from deepagents import create_deep_agents
+    from deepagents import create_deep_agent
 
     cfg = _load_settings()
     search_tool = _make_internet_search(cfg["tavily_api_key"])
 
-    main_model = overrides.pop("model", f"google_genai:{cfg['planner_model']}")
-    worker_model = overrides.pop("worker_model", f"google_genai:{cfg['worker_model']}")
+    main_model = overrides.pop("model", f"deepseek:{cfg['planner_model']}")
+    worker_model = overrides.pop("worker_model", f"deepseek:{cfg['worker_model']}")
 
     research_subagent: dict[str, Any] = {
         "name": "research-worker",
@@ -238,7 +238,7 @@ def build_deep_agent(**overrides: Any) -> CompiledStateGraph:
         "model": worker_model,
     }
 
-    return create_deep_agents(
+    return create_deep_agent(
         model=main_model,
         tools=[search_tool],
         system_prompt=SUPERVISOR_PROMPT,

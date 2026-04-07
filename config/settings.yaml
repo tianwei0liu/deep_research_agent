@@ -3,13 +3,13 @@
 # API keys are never stored here; use .env for sensitive keys only.
 
 # Worker and tools
-worker_model: "gemini-3-flash-preview"
+worker_model: "deepseek-chat"
 worker_temperature: 0.0
-planner_model: "gemini-3-flash-preview"
+planner_model: "deepseek-chat"
 planner_temperature: 0.0
-composer_model: "gemini-3-flash-preview"
+composer_model: "deepseek-chat"
 composer_temperature: 0.5
-grader_model: "gemini-3.1-pro-preview"
+grader_model: "deepseek-chat"
 grader_temperature: 0.0
 tavily_search_url: "https://api.tavily.com/search"
 tavily_max_result_chars: 12000
