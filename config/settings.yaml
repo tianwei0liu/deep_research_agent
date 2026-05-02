@@ -2,25 +2,21 @@
 # Override with env vars (e.g. DEEP_RESEARCH_AGENT_SUBAGENT_MODEL) if needed.
 # API keys are never stored here; use .env for sensitive keys only.
 
-# Worker and tools
-worker_model: "deepseek-chat"
-worker_temperature: 0.0
+# Deep Agent models (used by create_deep_agent supervisor + worker)
 planner_model: "deepseek-chat"
 planner_temperature: 0.0
-composer_model: "deepseek-chat"
-composer_temperature: 0.5
+worker_model: "deepseek-chat"
+worker_temperature: 0.0
+
+# Grader (LLM-as-Judge, uses Gemini SDK directly)
 grader_model: "deepseek-chat"
 grader_temperature: 0.0
-tavily_search_url: "https://api.tavily.com/search"
-tavily_max_result_chars: 12000
-worker_context_caching_enabled: false
-
-# Extended Thinking Levels (low, medium, high)
-supervisor_thinking_level: "high"
-worker_thinking_level: "medium"
-composer_thinking_level: "medium"
 grader_thinking_level: "medium"
 grader_google_search_enabled: true
+
+# Tavily Search
+tavily_search_url: "https://api.tavily.com/search"
+tavily_max_result_chars: 12000
 
 # LangSmith / LangChain (tracing); SDK reads from environment — we set these from YAML at load time
 langchain:

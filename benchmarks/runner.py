@@ -1,7 +1,8 @@
-"""Benchmark runner: executes benchmark cases through the orchestrator and collects results.
+"""Benchmark runner: executes benchmark cases through the deep agent and collects results.
 
-Loads cases from JSON, runs each through the full OrchestratorGraph pipeline,
-captures operational metrics, and delegates scoring to the BenchmarkGrader.
+Loads cases from JSON, runs each through the ``build_deep_agent`` pipeline,
+captures operational metrics via ``astream_events``, and delegates scoring
+to the ``BenchmarkGrader``.
 """
 
 import json
@@ -10,11 +11,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from langchain_core.messages import HumanMessage
-
-from deep_research_agent.agents.orchestrator.graph import OrchestratorGraph
-from deep_research_agent.agents.orchestrator.state import OrchestratorConfig
-from deep_research_agent.agents.worker.schemas import Limits
+from deep_research_agent.agents.deep_agent import build_deep_agent
 from deep_research_agent.benchmarks.benchmark_case import BenchmarkCase, EvaluationResult
 from deep_research_agent.benchmarks.grader import BenchmarkGrader
 from deep_research_agent.config import Settings
@@ -25,7 +22,7 @@ _DEFAULT_DATASET_PATH = Path(__file__).parent / "datasets" / "core.json"
 
 
 class BenchmarkRunner:
-    """Runs benchmark cases through the research agent and evaluates results.
+    """Runs benchmark cases through the deep research agent and evaluates results.
 
     Args:
         settings: Application settings (API keys, model config).
@@ -83,7 +80,8 @@ class BenchmarkRunner:
     async def run_case(self, case: BenchmarkCase) -> EvaluationResult:
         """Execute a single benchmark case end-to-end.
 
-        Runs the orchestrator, captures metrics, grades the output.
+        Runs the deep agent, captures metrics from streaming events,
+        and grades the output.
 
         Args:
             case: The benchmark case to execute.
@@ -93,55 +91,49 @@ class BenchmarkRunner:
         """
         self.logger.info("=== Running case: %s (%s) ===", case.id, case.category)
 
-        # Build orchestrator
-        orchestrator = OrchestratorGraph()
-        app = orchestrator.compile()
+        agent = build_deep_agent()
 
-        config = OrchestratorConfig(
-            messages=[HumanMessage(content=case.query)],
-            max_parallel_workers=self._settings.default_max_parallel_workers,
-            recursion_limit=self._settings.default_recursion_limit,
-            worker_limits=Limits(
-                max_tool_calls=self._settings.default_worker_max_tool_calls,
-                max_turns=self._settings.default_worker_max_turns,
-                max_output_tokens=self._settings.default_worker_max_output_tokens,
-            ),
-        )
-        initial_state = config.to_state()
-        recursion_limit = initial_state.get("recursion_limit", self._settings.default_recursion_limit)
-
-        # Execute and capture metrics
+        # Execute and capture metrics via astream_events
         start_time = time.monotonic()
         final_report = ""
-        todos: list = []
-        turn_count = 0
         tool_call_count = 0
+        turn_count = 0
+        task_objectives: List[str] = []
 
         try:
-            async for event in app.astream(
-                initial_state,
-                config={"recursion_limit": recursion_limit, "run_name": "Orchestrator"},
+            async for event in agent.astream_events(
+                {"messages": [{"role": "user", "content": case.query}]},
+                version="v2",
             ):
-                for key, value in event.items():
+                kind = event.get("event", "")
+
+                if kind == "on_tool_start":
+                    tool_call_count += 1
+                    tool_name = event.get("name", "")
+                    tool_input = event.get("data", {}).get("input", {})
+                    # Capture task-related tool calls for decomposition scoring
+                    if tool_name in ("task", "write_todos"):
+                        if isinstance(tool_input, dict):
+                            objective = (
+                                tool_input.get("instructions")
+                                or tool_input.get("description")
+                                or tool_input.get("input", "")
+                            )
+                            if objective:
+                                task_objectives.append(str(objective)[:200])
+
+                elif kind == "on_chat_model_end":
                     turn_count += 1
-
-                    if "messages" in value:
-                        last_msg = value["messages"][-1]
-                        if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
-                            tool_call_count += len(last_msg.tool_calls)
-
-                    if "todos" in value:
-                        todos = value["todos"]
-
-                    if "final_report" in value and value["final_report"]:
-                        final_report = value["final_report"]
+                    # Extract final content from the last model response
+                    output = event.get("data", {}).get("output")
+                    if output and hasattr(output, "content") and output.content:
+                        final_report = output.content
 
         except Exception as exc:
-            self.logger.exception("Orchestrator execution failed for case %s", case.id)
+            self.logger.exception("Agent execution failed for case %s", case.id)
             final_report = f"EXECUTION ERROR: {exc}"
 
         elapsed = time.monotonic() - start_time
-        task_objectives = [t.objective for t in todos]
 
         self.logger.info(
             "Case %s completed in %.1fs — %d turns, %d tool calls, %d tasks",
@@ -149,7 +141,7 @@ class BenchmarkRunner:
             elapsed,
             turn_count,
             tool_call_count,
-            len(todos),
+            len(task_objectives),
         )
 
         # Grade the report
@@ -180,7 +172,7 @@ class BenchmarkRunner:
             total_time_seconds=round(elapsed, 2),
             total_tool_calls=tool_call_count,
             total_turns=turn_count,
-            task_count=len(todos),
+            task_count=len(task_objectives),
             final_report=final_report,
             grader_reasoning=scores["reasoning"],
         )

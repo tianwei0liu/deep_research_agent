@@ -1,19 +1,26 @@
-"""Deep Research Agent built with `deepagents.create_deep_agent`.
+"""Deep Research Agent built with ``deepagents.create_deep_agent``.
 
-Replicates the project's Supervisor-Worker deep research functionality
-using the official LangGraph `deepagents` library in minimal code.
+Provides:
+- ``build_deep_agent``      — compile a LangGraph agent with optional checkpointer.
+- ``run_deep_research``     — one-shot query → full report text.
+- ``stream_deep_research``  — async generator yielding structured streaming events.
 """
 
 from __future__ import annotations
 
+import logging
 import os
-from typing import Any, Literal, TYPE_CHECKING
+import uuid
+from typing import Any, AsyncGenerator, Literal, Optional, TYPE_CHECKING
 
 from dotenv import load_dotenv
 
 if TYPE_CHECKING:
-    from deepagents import SubAgent
     from langgraph.graph.state import CompiledStateGraph
+    from langgraph.types import Checkpointer
+
+logger = logging.getLogger(__name__)
+
 
 # ---------------------------------------------------------------------------
 # Config helpers
@@ -77,10 +84,17 @@ def _make_internet_search(api_key: str):
 
 
 # ---------------------------------------------------------------------------
-# System prompts (distilled from existing OrchestratorPrompts)
+# Prompt templates (encapsulated per coding standards)
 # ---------------------------------------------------------------------------
 
-SUPERVISOR_PROMPT = """\
+class DeepAgentPrompts:
+    """Encapsulated prompt templates for the deep research agent.
+
+    Distilled from the original OrchestratorPrompts into the
+    Supervisor-Worker pattern used by ``create_deep_agent``.
+    """
+
+    SUPERVISOR: str = """\
 You are a Research Supervisor. Your goal is to answer the user's request by coordinating a team of research workers.
 
 ## Your Role
@@ -140,7 +154,7 @@ When analyzing a User Query, explicitly select one of these decomposition patter
 Before decomposing a query, you MUST classify its complexity in your reasoning:
 
 | Complexity   | Characteristics                                                                                                  | Target Tasks |
-|--------------|------------------------------------------------------------------------------------------------------------------|--------------|
+|--------------|------------------------------------------------------------------------------------------------------------------|-----------   |
 | **Simple**   | Single fact, single entity, narrow scope (e.g., "What is the capital of France?")                                | 1-2          |
 | **Moderate** | Multi-faceted single topic, OR comparison of 2-3 entities (e.g., "Compare pricing of Vercel vs Netlify")         | 2-3          |
 | **Complex**  | Broad "State of X", multi-entity comparison (4+), OR requires combining two decomposition patterns               | 3-6          |
@@ -171,7 +185,7 @@ When your research is complete, the final report must follow these standards:
 5.  **Tone**: Professional, objective, and authoritative.
 """
 
-WORKER_PROMPT = """\
+    WORKER: str = """\
 ## Role
 You are an expert research worker. Think like a human researcher with limited time. Your goal is to answer the user's objective in the **exact** requested format as efficiently as possible.
 
@@ -208,13 +222,19 @@ You are an expert research worker. Think like a human researcher with limited ti
 # Agent factory
 # ---------------------------------------------------------------------------
 
-def build_deep_agent(**overrides: Any) -> CompiledStateGraph:
+def build_deep_agent(
+    *,
+    checkpointer: Optional[Checkpointer] = None,
+    **overrides: Any,
+) -> CompiledStateGraph:
     """Build and return a compiled deep research agent.
 
-    Keyword Args:
-        model: Override the main orchestrator model (default: from settings).
-        worker_model: Override the worker subagent model (default: from settings).
-        Any other kwarg is forwarded to ``create_deep_agent``.
+    Args:
+        checkpointer: Optional LangGraph checkpointer for state persistence
+            and multi-turn conversation support (e.g. ``MemorySaver()``).
+        **overrides: Forwarded to ``create_deep_agent``.
+            - ``model``: Override the main orchestrator model.
+            - ``worker_model``: Override the worker subagent model.
 
     Returns:
         A compiled LangGraph ``CompiledStateGraph``.
@@ -233,7 +253,7 @@ def build_deep_agent(**overrides: Any) -> CompiledStateGraph:
             "Conducts focused web research on a specific sub-topic. "
             "Delegate narrow, well-scoped objectives to this agent."
         ),
-        "system_prompt": WORKER_PROMPT,
+        "system_prompt": DeepAgentPrompts.WORKER,
         "tools": [search_tool],
         "model": worker_model,
     }
@@ -241,28 +261,136 @@ def build_deep_agent(**overrides: Any) -> CompiledStateGraph:
     return create_deep_agent(
         model=main_model,
         tools=[search_tool],
-        system_prompt=SUPERVISOR_PROMPT,
+        system_prompt=DeepAgentPrompts.SUPERVISOR,
         subagents=[research_subagent],
+        checkpointer=checkpointer,
         **overrides,
     )
 
 
 # ---------------------------------------------------------------------------
-# Convenience runner
+# Streaming runner (async generator)
 # ---------------------------------------------------------------------------
 
-async def run_deep_research(query: str, **overrides: Any) -> str:
+async def stream_deep_research(
+    query: str,
+    *,
+    thread_id: Optional[str] = None,
+    checkpointer: Optional[Checkpointer] = None,
+    **overrides: Any,
+) -> AsyncGenerator[dict[str, Any], None]:
+    """Stream a deep research query, yielding structured events in real time.
+
+    This is the primary entry point for building UIs or CLI tools that need
+    incremental feedback during long-running research.
+
+    Args:
+        query: The research question (or follow-up message for multi-turn).
+        thread_id: Conversation thread ID. When the same ``thread_id`` is
+            reused across calls (with a checkpointer), the agent resumes
+            the previous conversation — enabling multi-turn research.
+            Defaults to a new UUID if not provided.
+        checkpointer: Optional checkpointer for persistence. Required for
+            multi-turn conversations across calls.
+        **overrides: Forwarded to ``build_deep_agent``.
+
+    Yields:
+        Structured event dicts with ``type`` and ``data`` keys:
+        - ``{"type": "status", "data": "..."}`` — lifecycle status messages.
+        - ``{"type": "tool_start", "data": {"name": ..., "input": ...}}``
+        - ``{"type": "tool_end", "data": {"name": ..., "output": ...}}``
+        - ``{"type": "token", "data": "..."}`` — streamed output tokens.
+        - ``{"type": "final_report", "data": "..."}`` — the complete report.
+    """
+    resolved_thread_id = thread_id or str(uuid.uuid4())
+    agent = build_deep_agent(checkpointer=checkpointer, **overrides)
+
+    config = {"configurable": {"thread_id": resolved_thread_id}}
+
+    yield {"type": "status", "data": f"Starting research (thread={resolved_thread_id})"}
+
+    final_content = ""
+
+    async for event in agent.astream_events(
+        {"messages": [{"role": "user", "content": query}]},
+        config=config,
+        version="v2",
+    ):
+        kind = event.get("event", "")
+
+        if kind == "on_tool_start":
+            tool_name = event.get("name", "unknown")
+            tool_input = event.get("data", {}).get("input", {})
+            yield {"type": "tool_start", "data": {"name": tool_name, "input": tool_input}}
+
+        elif kind == "on_tool_end":
+            tool_name = event.get("name", "unknown")
+            tool_output = event.get("data", {}).get("output", "")
+            # Truncate large tool outputs for streaming consumers
+            output_str = str(tool_output)
+            if len(output_str) > 500:
+                output_str = output_str[:500] + "..."
+            yield {"type": "tool_end", "data": {"name": tool_name, "output": output_str}}
+
+        elif kind == "on_chat_model_stream":
+            chunk = event.get("data", {}).get("chunk")
+            if chunk and hasattr(chunk, "content") and chunk.content:
+                token = chunk.content
+                if isinstance(token, str):
+                    final_content += token
+                    yield {"type": "token", "data": token}
+
+    # Extract final report from the last message if streaming didn't capture it
+    if not final_content:
+        try:
+            state = await agent.aget_state(config)
+            messages = state.values.get("messages", [])
+            if messages:
+                last_msg = messages[-1]
+                if hasattr(last_msg, "content"):
+                    final_content = last_msg.content
+        except Exception:
+            logger.warning("Could not retrieve final state for report extraction")
+
+    if final_content:
+        yield {"type": "final_report", "data": final_content}
+
+    yield {"type": "status", "data": "Research complete"}
+
+
+# ---------------------------------------------------------------------------
+# Convenience one-shot runner
+# ---------------------------------------------------------------------------
+
+async def run_deep_research(
+    query: str,
+    *,
+    thread_id: Optional[str] = None,
+    checkpointer: Optional[Checkpointer] = None,
+    **overrides: Any,
+) -> str:
     """Run a deep research query end-to-end, return the final report text.
+
+    This is a convenience wrapper around ``stream_deep_research`` that
+    consumes all events and returns the final report.
 
     Args:
         query: The research question.
+        thread_id: Optional thread ID for multi-turn conversations.
+        checkpointer: Optional checkpointer for state persistence.
         **overrides: Forwarded to ``build_deep_agent``.
 
     Returns:
         The final assistant message content (markdown report).
     """
-    agent = build_deep_agent(**overrides)
-    result = await agent.ainvoke(
-        {"messages": [{"role": "user", "content": query}]}
-    )
-    return result["messages"][-1].content
+    report = ""
+    async for event in stream_deep_research(
+        query,
+        thread_id=thread_id,
+        checkpointer=checkpointer,
+        **overrides,
+    ):
+        if event["type"] == "final_report":
+            report = event["data"]
+
+    return report

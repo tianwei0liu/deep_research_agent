@@ -29,11 +29,12 @@ dev = [
 [tool.setuptools.package-dir]
 "deep_research_agent" = "."
 
-[tool.setuptools.packages]
-packages = ["deep_research_agent", "deep_research_agent.config", "deep_research_agent.agents", "deep_research_agent.agents.worker", "deep_research_agent.agents.orchestrator", "deep_research_agent.agents.utils", "deep_research_agent.agents.deep_agent", "deep_research_agent.tools"]
+[tool.setuptools.packages.find]
+where = [".."]
+include = ["deep_research_agent*"]
 
 [tool.setuptools.package-data]
-deep_research_agent.config = ["settings.yaml"]
+"deep_research_agent.config" = ["settings.yaml"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "strict"

@@ -1,12 +1,11 @@
-# Subagent: Gemini + Tavily
+# Core dependencies
 google-genai>=1.0.0
 httpx>=0.27.0
 langgraph>=1.0.0
 python-dotenv>=1.0.0
 langsmith>=0.7.0
-langchain-deepseek
 pyyaml>=6.0
 
-# Deep Agent (create_deep_agents)
+# Deep Agent (create_deep_agent)
 deepagents @ git+https://github.com/langchain-ai/deepagents.git#subdirectory=libs/deepagents
 tavily-python

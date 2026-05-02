@@ -21,24 +21,32 @@ from pathlib import Path
 class Settings:
     """Immutable settings: secrets from env, options from YAML + env override."""
 
+    # --- API Keys ---
     gemini_api_key: str
     tavily_api_key: str
-    worker_model: str
-    worker_temperature: float
+
+    # --- Deep Agent Models ---
     planner_model: str
     planner_temperature: float
-    composer_model: str
-    composer_temperature: float
+    worker_model: str
+    worker_temperature: float
+
+    # --- Grader (LLM-as-Judge, uses Gemini) ---
     grader_model: str
     grader_temperature: float
-    tavily_search_url: str
-    tavily_max_result_chars: int
-    worker_context_caching_enabled: bool
-    supervisor_thinking_level: str
-    worker_thinking_level: str
-    composer_thinking_level: str
     grader_thinking_level: str
     grader_google_search_enabled: bool
+
+    # --- Tavily ---
+    tavily_search_url: str
+    tavily_max_result_chars: int
+
+    # --- Orchestration Limits (used by benchmark runner) ---
+    default_max_parallel_workers: int
+    default_recursion_limit: int
+    default_worker_max_tool_calls: int
+    default_worker_max_turns: int
+    default_worker_max_output_tokens: int
 
     def require_gemini_api_key(self) -> str:
         if not self.gemini_api_key:
@@ -100,33 +108,19 @@ class Settings:
         return cls(
             gemini_api_key=cls._env("GOOGLE_GEMINI_API_KEY"),
             tavily_api_key=cls._env("TAVILY_API_KEY"),
-            worker_model=yaml_data.get("worker_model", "deepseek-chat"),
-            worker_temperature=float(yaml_data.get("worker_temperature", 0.0)),
             planner_model=yaml_data.get("planner_model", "deepseek-chat"),
             planner_temperature=float(yaml_data.get("planner_temperature", 0.0)),
-            composer_model=yaml_data.get("composer_model", "deepseek-chat"),
-            composer_temperature=float(yaml_data.get("composer_temperature", 0.5)),
+            worker_model=yaml_data.get("worker_model", "deepseek-chat"),
+            worker_temperature=float(yaml_data.get("worker_temperature", 0.0)),
             grader_model=yaml_data.get("grader_model", "deepseek-chat"),
             grader_temperature=float(yaml_data.get("grader_temperature", 0.0)),
-            tavily_search_url=yaml_data.get("tavily_search_url", "https://api.tavily.com/search"),
-            tavily_max_result_chars=int(yaml_data.get("tavily_max_result_chars", 12000)),
-            worker_context_caching_enabled=bool(yaml_data.get("worker_context_caching_enabled", False)),
-            supervisor_thinking_level=yaml_data.get("supervisor_thinking_level", "high"),
-            worker_thinking_level=yaml_data.get("worker_thinking_level", "medium"),
-            composer_thinking_level=yaml_data.get("composer_thinking_level", "medium"),
             grader_thinking_level=yaml_data.get("grader_thinking_level", "medium"),
             grader_google_search_enabled=bool(yaml_data.get("grader_google_search_enabled", True)),
-            # Default Limits
+            tavily_search_url=yaml_data.get("tavily_search_url", "https://api.tavily.com/search"),
+            tavily_max_result_chars=int(yaml_data.get("tavily_max_result_chars", 12000)),
             default_max_parallel_workers=int(yaml_data.get("default_max_parallel_workers", 10)),
             default_recursion_limit=int(yaml_data.get("default_recursion_limit", 25)),
             default_worker_max_tool_calls=int(yaml_data.get("default_worker_max_tool_calls", 40)),
             default_worker_max_turns=int(yaml_data.get("default_worker_max_turns", 10)),
             default_worker_max_output_tokens=int(yaml_data.get("default_worker_max_output_tokens", 8192)),
         )
-
-    # Defaults
-    default_max_parallel_workers: int
-    default_recursion_limit: int
-    default_worker_max_tool_calls: int
-    default_worker_max_turns: int
-    default_worker_max_output_tokens: int

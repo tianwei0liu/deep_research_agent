@@ -1,6 +1,9 @@
-"""Agent layer: worker, states, and related types."""
+"""Agent layer: deep research agent built on ``deepagents``."""
 
-from deep_research_agent.agents.worker.schemas import Limits, SpawnTask, WorkerResult
-from deep_research_agent.agents.worker import Worker
+from deep_research_agent.agents.deep_agent import (
+    build_deep_agent,
+    run_deep_research,
+    stream_deep_research,
+)
 
-__all__ = ["Worker", "SpawnTask", "Limits", "WorkerResult"]
+__all__ = ["build_deep_agent", "run_deep_research", "stream_deep_research"]

@@ -2,16 +2,16 @@
 
 Usage:
     # Run all benchmarks
-    PYTHONPATH=.. python3 examples/run_benchmark.py
+    PYTHONPATH=.. python examples/run_benchmark.py
 
     # Run only comparative cases
-    PYTHONPATH=.. python3 examples/run_benchmark.py --category comparative
+    PYTHONPATH=.. python examples/run_benchmark.py --category comparative
 
     # Run a single case
-    PYTHONPATH=.. python3 examples/run_benchmark.py --cases factual_001
+    PYTHONPATH=.. python examples/run_benchmark.py --cases factual_001
 
     # Debug mode
-    PYTHONPATH=.. python3 examples/run_benchmark.py --verbose
+    PYTHONPATH=.. python examples/run_benchmark.py --verbose
 """
 
 import argparse
