@@ -370,6 +370,14 @@ def build_deep_agent(
         "response_format": WorkerOutput,
     }
 
+    from langgraph.prebuilt import create_react_agent
+    
+    citation_graph = create_react_agent(
+        worker_model,
+        tools=[],
+        prompt=DeepAgentPrompts.CITATION_SPECIALIST
+    )
+
     citation_specialist: dict[str, Any] = {
         "name": "citation-specialist",
         "description": (
@@ -378,9 +386,7 @@ def build_deep_agent(
             "and you have written a draft report. Pass ONLY the draft report "
             "as the task description — worker findings are auto-injected."
         ),
-        "system_prompt": DeepAgentPrompts.CITATION_SPECIALIST,
-        "tools": [],
-        "model": worker_model,
+        "runnable": citation_graph,
     }
 
     return create_deep_agent(
@@ -431,14 +437,17 @@ async def stream_deep_research(
     resolved_thread_id = thread_id or str(uuid.uuid4())
     agent = build_deep_agent(checkpointer=checkpointer, **overrides)
 
-    config = {"configurable": {"thread_id": resolved_thread_id}}
+    config = {
+        "configurable": {"thread_id": resolved_thread_id},
+        "recursion_limit": 100,
+    }
 
     yield {"type": "status", "data": f"Starting research (thread={resolved_thread_id})"}
 
-    final_content = ""
-
+    # We only stream tokens from the top-level supervisor to avoid interleaving
+    # worker/citation specialist thoughts.
     async for event in agent.astream_events(
-        {"messages": [{"role": "user", "content": query}]},
+        {"messages": [("user", query)]},
         config=config,
         version="v2",
     ):
@@ -459,27 +468,26 @@ async def stream_deep_research(
             yield {"type": "tool_end", "data": {"name": tool_name, "output": output_str}}
 
         elif kind == "on_chat_model_stream":
-            chunk = event.get("data", {}).get("chunk")
-            if chunk and hasattr(chunk, "content") and chunk.content:
-                token = chunk.content
-                if isinstance(token, str):
-                    final_content += token
-                    yield {"type": "token", "data": token}
+            # Only stream the top-level agent to avoid interleaved garbage output
+            langgraph_node = event.get("metadata", {}).get("langgraph_node")
+            if langgraph_node == "agent":
+                chunk = event.get("data", {}).get("chunk")
+                if chunk and hasattr(chunk, "content") and chunk.content:
+                    token = chunk.content
+                    if isinstance(token, str):
+                        yield {"type": "token", "data": token}
 
-    # Extract final report from the last message if streaming didn't capture it
-    if not final_content:
-        try:
-            state = await agent.aget_state(config)
-            messages = state.values.get("messages", [])
-            if messages:
-                last_msg = messages[-1]
-                if hasattr(last_msg, "content"):
-                    final_content = last_msg.content
-        except Exception:
-            logger.warning("Could not retrieve final state for report extraction")
-
-    if final_content:
-        yield {"type": "final_report", "data": final_content}
+    # Extract final report reliably from the final graph state.
+    # The supervisor is instructed to output the final report as its final response.
+    try:
+        state = await agent.aget_state(config)
+        messages = state.values.get("messages", [])
+        if messages:
+            last_msg = messages[-1]
+            if hasattr(last_msg, "content") and last_msg.content:
+                yield {"type": "final_report", "data": last_msg.content}
+    except Exception as e:
+        logger.error("Failed to extract final report from state: %s", e)
 
     yield {"type": "status", "data": "Research complete"}
 
