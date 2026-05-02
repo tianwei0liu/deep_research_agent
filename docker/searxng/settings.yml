@@ -1,0 +1,65 @@
+# SearXNG Engine Configuration for Deep Research Agent
+#
+# Strategy:
+# - Enable Chinese mainland accessible engines (baidu, sogou, 360search, bing)
+# - Disable GFW-blocked engines (google, duckduckgo, brave, yahoo)
+# - Baidu has highest weight (best Chinese content quality)
+# - JSON format enabled for API consumption
+
+use_default_settings: true
+
+search:
+  formats:
+    - html
+    - json
+  default_lang: zh-CN
+  autocomplete: ""
+  safe_search: 0
+
+server:
+  secret_key: "change-this-in-production"
+  limiter: false
+  image_proxy: false
+
+outgoing:
+  request_timeout: 8.0
+  max_request_timeout: 12.0
+
+engines:
+  # === Enabled: China mainland accessible ===
+
+  - name: baidu
+    engine: baidu
+    disabled: false
+    timeout: 6.0
+    weight: 2.0  # Highest priority — best Chinese search quality
+
+  - name: sogou
+    engine: sogou
+    disabled: false
+    timeout: 5.0
+    weight: 1.0
+
+  - name: bing
+    engine: bing
+    disabled: false
+    timeout: 5.0
+    weight: 1.0
+
+  # === Disabled: GFW blocked or unreliable ===
+
+  - name: google
+    engine: google
+    disabled: true
+
+  - name: duckduckgo
+    engine: duckduckgo
+    disabled: true
+
+  - name: brave
+    engine: brave
+    disabled: true
+
+  - name: yahoo
+    engine: yahoo
+    disabled: true
