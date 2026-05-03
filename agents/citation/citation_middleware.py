@@ -1,11 +1,11 @@
-"""CitationDataMiddleware — auto-inject Worker findings + L1 validation gate.
+"""CitationDataMiddleware -- auto-inject Worker findings + L1 validation gate.
 
 This middleware intercepts ``task(citation-specialist, ...)`` calls at
 the Supervisor level and performs three functions:
 
 1. **Data injection**: Extracts Worker findings from Supervisor state
-   and appends them to the CitationAgent's input description.
-2. **L1 validation gate**: Validates the CitationAgent's output against
+   and appends them to the CitationAgent input description.
+2. **L1 validation gate**: Validates the CitationAgent output against
    L1 structural rules (dangling citations, orphan sources, etc.).
 3. **Self-correction retry**: On L1 ERROR, re-invokes the CitationAgent
    with correction instructions (up to MAX_RETRIES times).
@@ -24,11 +24,11 @@ from langchain_core.messages import ToolMessage
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.types import Command
 
-from deep_research_agent.agents.deep_agent.citation.models import (
+from deep_research_agent.agents.citation.models import (
     Severity,
     WorkerOutput,
 )
-from deep_research_agent.agents.deep_agent.citation.structure_validator import (
+from deep_research_agent.agents.citation.structure_validator import (
     CitationStructureValidator,
 )
 
@@ -39,17 +39,17 @@ class CitationDataMiddleware(AgentMiddleware):
     """Intercepts citation-specialist task calls for auto-injection and L1 gating.
 
     Registered in ``create_deep_agent(middleware=[CitationDataMiddleware()])``
-    on the Supervisor's middleware stack. Only fires for
+    on the Supervisor middleware stack. Only fires for
     ``task(subagent_type="citation-specialist")`` calls; all other tool
     calls pass through unmodified.
-
-    Attributes:
-        MAX_RETRIES: Maximum retry attempts on L1 ERROR (default 1).
     """
 
-    MAX_RETRIES: int = 1
+    DEFAULT_MAX_RETRIES: int = 5
 
-    def __init__(self) -> None:
+    def __init__(self, *, max_retries: int | None = None) -> None:
+        self._max_retries = (
+            max_retries if max_retries is not None else self.DEFAULT_MAX_RETRIES
+        )
         self._logger = logging.getLogger(__name__)
         self._validator = CitationStructureValidator()
 
@@ -64,7 +64,7 @@ class CitationDataMiddleware(AgentMiddleware):
     ) -> ToolMessage | Command[Any]:
         """Sync interception of tool calls.
 
-        For citation-specialist tasks: inject findings → validate → retry.
+        For citation-specialist tasks: inject findings -> validate -> retry.
         For all other tools: pass through.
         """
         if not self._is_citation_specialist_task(request):
@@ -143,15 +143,17 @@ class CitationDataMiddleware(AgentMiddleware):
 
         # --- Retry loop ---
         worker_findings = self._extract_worker_findings(request.state)
-        for attempt in range(self.MAX_RETRIES):
+        for attempt in range(self._max_retries):
             self._logger.warning(
                 "L1 validation failed (attempt %d/%d), retrying: %d errors",
                 attempt + 1,
-                self.MAX_RETRIES,
+                self._max_retries,
                 l1_result.error_count,
             )
             correction_desc = self._build_correction_description(
-                l1_result, report, worker_findings
+                l1_result, report, worker_findings,
+                attempt=attempt,
+                max_retries=self._max_retries,
             )
             retry_call = {
                 **request.tool_call,
@@ -172,7 +174,7 @@ class CitationDataMiddleware(AgentMiddleware):
         # --- Retries exhausted ---
         self._logger.warning(
             "L1 retry exhausted after %d attempts, appending warning",
-            self.MAX_RETRIES,
+            self._max_retries,
         )
         return self._append_warning(result, l1_result)
 
@@ -191,15 +193,17 @@ class CitationDataMiddleware(AgentMiddleware):
             return result
 
         worker_findings = self._extract_worker_findings(request.state)
-        for attempt in range(self.MAX_RETRIES):
+        for attempt in range(self._max_retries):
             self._logger.warning(
                 "L1 validation failed (attempt %d/%d), retrying: %d errors",
                 attempt + 1,
-                self.MAX_RETRIES,
+                self._max_retries,
                 l1_result.error_count,
             )
             correction_desc = self._build_correction_description(
-                l1_result, report, worker_findings
+                l1_result, report, worker_findings,
+                attempt=attempt,
+                max_retries=self._max_retries,
             )
             retry_call = {
                 **request.tool_call,
@@ -219,7 +223,7 @@ class CitationDataMiddleware(AgentMiddleware):
 
         self._logger.warning(
             "L1 retry exhausted after %d attempts, appending warning",
-            self.MAX_RETRIES,
+            self._max_retries,
         )
         return self._append_warning(result, l1_result)
 
@@ -228,7 +232,7 @@ class CitationDataMiddleware(AgentMiddleware):
         """Extract all WorkerOutput JSONs from ToolMessages in state.
 
         Args:
-            state: The Supervisor's agent state dict.
+            state: The Supervisor agent state dict.
 
         Returns:
             Concatenated JSON strings of Worker findings, separated by ``---``.
@@ -277,15 +281,22 @@ class CitationDataMiddleware(AgentMiddleware):
         l1_result: Any,
         original_report: str,
         worker_findings: str,
+        *,
+        attempt: int = 0,
+        max_retries: int = 5,
     ) -> str:
         """Build a correction description for retry.
 
-        Only includes ERROR-level issues (not warnings).
+        Only includes ERROR-level issues (not warnings).  Appends a
+        budget status line so the Citation Specialist knows how many
+        retries remain.
 
         Args:
             l1_result: The L1ValidationResult with issues.
-            original_report: The CitationAgent's output that failed L1.
+            original_report: The CitationAgent output that failed L1.
             worker_findings: Worker findings JSON string.
+            attempt: Current retry attempt index (0-based).
+            max_retries: Total retry budget.
 
         Returns:
             Formatted correction description for the retry request.
@@ -297,14 +308,28 @@ class CitationDataMiddleware(AgentMiddleware):
             f"- {i.rule_id}: {i.message}" for i in error_issues
         )
 
+        remaining = max_retries - attempt - 1
+
         parts = [
             "## CITATION CORRECTION REQUIRED\n",
             "The following citation issues were found in your output:\n",
             issues_text,
             "\nPlease fix these issues and output the corrected report.\n",
-            "## ORIGINAL REPORT (with issues)\n",
-            original_report,
+            f"## \u23f1 Citation Budget\n",
+            f"- Retry attempt: {attempt + 1} / {max_retries}\n",
+            f"- Remaining retries: {remaining}\n",
         ]
+
+        if remaining <= 1:
+            parts.append(
+                "- \u26a0\ufe0f This is your LAST chance. Fix as many issues as "
+                "possible in this attempt.\n"
+            )
+
+        parts.extend([
+            "\n## ORIGINAL REPORT (with issues)\n",
+            original_report,
+        ])
 
         if worker_findings:
             parts.extend([

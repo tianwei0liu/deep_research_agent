@@ -3,13 +3,13 @@
 # API keys are never stored here; use .env for sensitive keys only.
 
 # Deep Agent models (used by create_deep_agent supervisor + worker)
-planner_model: "deepseek-chat"
+planner_model: "deepseek-v4-flash"
 planner_temperature: 0.0
-worker_model: "deepseek-chat"
+worker_model: "deepseek-v4-flash"
 worker_temperature: 0.0
 
 # Grader (LLM-as-Judge, uses Gemini SDK directly)
-grader_model: "deepseek-chat"
+grader_model: "deepseek-v4-flash"
 grader_temperature: 0.0
 grader_thinking_level: "medium"
 grader_google_search_enabled: true
@@ -27,9 +27,16 @@ langsmith_endpoint: "https://api.smith.langchain.com"
 # Optional: DeepSeek base URL (when using DeepSeek client)
 deepseek_base_url: "https://api.deepseek.com"
 
-# Orchestrator & Worker Limits (Defaults)
-default_max_parallel_workers: 10
-default_recursion_limit: 25
-default_worker_max_tool_calls: 40
-default_worker_max_turns: 10
-default_worker_max_output_tokens: 8192
+# Orchestrator & Worker Limits
+max_parallel_workers: 10
+supervisor_max_turns: 35
+supervisor_max_search_calls: 10
+worker_max_search_calls: 60
+worker_max_turns: 20
+worker_max_output_tokens: 8192
+
+# Citation Agent Limits
+citation_max_retries: 5
+
+# Runtime Safety
+research_timeout_seconds: 600

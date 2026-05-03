@@ -41,12 +41,19 @@ class Settings:
     tavily_search_url: str
     tavily_max_result_chars: int
 
-    # --- Orchestration Limits (used by benchmark runner) ---
-    default_max_parallel_workers: int
-    default_recursion_limit: int
-    default_worker_max_tool_calls: int
-    default_worker_max_turns: int
-    default_worker_max_output_tokens: int
+    # --- Orchestration Limits ---
+    max_parallel_workers: int
+    supervisor_max_turns: int
+    supervisor_max_search_calls: int
+    worker_max_search_calls: int
+    worker_max_turns: int
+    worker_max_output_tokens: int
+
+    # --- Citation Agent Limits ---
+    citation_max_retries: int
+
+    # --- Runtime Safety ---
+    research_timeout_seconds: int
 
     def require_gemini_api_key(self) -> str:
         if not self.gemini_api_key:
@@ -118,9 +125,12 @@ class Settings:
             grader_google_search_enabled=bool(yaml_data.get("grader_google_search_enabled", True)),
             tavily_search_url=yaml_data.get("tavily_search_url", "https://api.tavily.com/search"),
             tavily_max_result_chars=int(yaml_data.get("tavily_max_result_chars", 12000)),
-            default_max_parallel_workers=int(yaml_data.get("default_max_parallel_workers", 10)),
-            default_recursion_limit=int(yaml_data.get("default_recursion_limit", 25)),
-            default_worker_max_tool_calls=int(yaml_data.get("default_worker_max_tool_calls", 40)),
-            default_worker_max_turns=int(yaml_data.get("default_worker_max_turns", 10)),
-            default_worker_max_output_tokens=int(yaml_data.get("default_worker_max_output_tokens", 8192)),
+            max_parallel_workers=int(yaml_data.get("max_parallel_workers", 10)),
+            supervisor_max_turns=int(yaml_data.get("supervisor_max_turns", 35)),
+            supervisor_max_search_calls=int(yaml_data.get("supervisor_max_search_calls", 10)),
+            worker_max_search_calls=int(yaml_data.get("worker_max_search_calls", 60)),
+            worker_max_turns=int(yaml_data.get("worker_max_turns", 20)),
+            worker_max_output_tokens=int(yaml_data.get("worker_max_output_tokens", 8192)),
+            citation_max_retries=int(yaml_data.get("citation_max_retries", 5)),
+            research_timeout_seconds=int(yaml_data.get("research_timeout_seconds", 600)),
         )

@@ -86,7 +86,7 @@ async def main() -> None:
     from langgraph.checkpoint.memory import MemorySaver
     checkpointer = MemorySaver()
 
-    from deep_research_agent.agents.deep_agent import stream_deep_research
+    from deep_research_agent.agents import stream_deep_research
 
     logger.info("Query: %s", args.query)
     if args.thread_id:

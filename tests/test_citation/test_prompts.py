@@ -6,7 +6,7 @@ Validates prompt content requirements from:
 - 02_citation_annotation_design.md §2.3 (Supervisor §6)
 """
 
-from deep_research_agent.agents.deep_agent.deep_agent import DeepAgentPrompts
+from deep_research_agent.agents.prompts import DeepAgentPrompts
 
 
 class TestWorkerPrompt:

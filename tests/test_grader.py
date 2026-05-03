@@ -25,11 +25,14 @@ def _make_settings(**overrides) -> Settings:
         grader_google_search_enabled=True,
         tavily_search_url="https://api.tavily.com/search",
         tavily_max_result_chars=1000,
-        default_max_parallel_workers=10,
-        default_recursion_limit=20,
-        default_worker_max_tool_calls=40,
-        default_worker_max_turns=10,
-        default_worker_max_output_tokens=8192,
+        max_parallel_workers=10,
+        supervisor_max_turns=35,
+        supervisor_max_search_calls=10,
+        worker_max_search_calls=60,
+        worker_max_turns=10,
+        worker_max_output_tokens=8192,
+        citation_max_retries=5,
+        research_timeout_seconds=600,
     )
     defaults.update(overrides)
     return Settings(**defaults)

@@ -21,3 +21,10 @@ examples/final_report.md
 # OS
 .DS_Store
 Thumbs.db
+
+# Developer-local
+.python-version
+
+# Debug artifacts
+trace_*.json
+trace_summary*.txt

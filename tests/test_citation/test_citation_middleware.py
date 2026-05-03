@@ -13,7 +13,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from deep_research_agent.agents.deep_agent.citation.models import (
+from deep_research_agent.agents.citation.models import (
     Finding,
     WorkerOutput,
 )
@@ -128,7 +128,7 @@ class TestDataInjection:
 
     def test_injects_findings_for_citation_specialist(self) -> None:
         """Middleware enriches description with Worker findings."""
-        from deep_research_agent.agents.deep_agent.citation.citation_middleware import (
+        from deep_research_agent.agents.citation.citation_middleware import (
             CitationDataMiddleware,
         )
 
@@ -152,7 +152,7 @@ class TestDataInjection:
 
     def test_ignores_non_citation_specialist_tasks(self) -> None:
         """Middleware passes through non-citation-specialist tasks."""
-        from deep_research_agent.agents.deep_agent.citation.citation_middleware import (
+        from deep_research_agent.agents.citation.citation_middleware import (
             CitationDataMiddleware,
         )
 
@@ -173,7 +173,7 @@ class TestDataInjection:
 
     def test_ignores_non_task_tools(self) -> None:
         """Middleware passes through non-task tools completely."""
-        from deep_research_agent.agents.deep_agent.citation.citation_middleware import (
+        from deep_research_agent.agents.citation.citation_middleware import (
             CitationDataMiddleware,
         )
 
@@ -191,7 +191,7 @@ class TestDataInjection:
 
     def test_handles_no_worker_outputs_gracefully(self) -> None:
         """With no Worker ToolMessages, description is unchanged."""
-        from deep_research_agent.agents.deep_agent.citation.citation_middleware import (
+        from deep_research_agent.agents.citation.citation_middleware import (
             CitationDataMiddleware,
         )
 
@@ -208,7 +208,7 @@ class TestDataInjection:
 
     def test_handles_malformed_json_gracefully(self) -> None:
         """Malformed JSON in ToolMessage is skipped, not crash."""
-        from deep_research_agent.agents.deep_agent.citation.citation_middleware import (
+        from deep_research_agent.agents.citation.citation_middleware import (
             CitationDataMiddleware,
         )
 
@@ -234,7 +234,7 @@ class TestL1ValidationGate:
 
     def test_valid_report_passes_without_retry(self) -> None:
         """L1-valid report passes through — handler called exactly once."""
-        from deep_research_agent.agents.deep_agent.citation.citation_middleware import (
+        from deep_research_agent.agents.citation.citation_middleware import (
             CitationDataMiddleware,
         )
 
@@ -255,7 +255,7 @@ class TestL1ValidationGate:
 
     def test_invalid_report_triggers_retry(self) -> None:
         """L1-invalid report (ERROR level) triggers retry."""
-        from deep_research_agent.agents.deep_agent.citation.citation_middleware import (
+        from deep_research_agent.agents.citation.citation_middleware import (
             CitationDataMiddleware,
         )
 
@@ -277,7 +277,7 @@ class TestL1ValidationGate:
 
     def test_warning_only_does_not_trigger_retry(self) -> None:
         """L1-WARNING only does NOT trigger retry."""
-        from deep_research_agent.agents.deep_agent.citation.citation_middleware import (
+        from deep_research_agent.agents.citation.citation_middleware import (
             CitationDataMiddleware,
         )
 
@@ -297,7 +297,7 @@ class TestL1ValidationGate:
 
     def test_retry_exhaustion_appends_warning(self) -> None:
         """When retry exhausted, report gets warning appended."""
-        from deep_research_agent.agents.deep_agent.citation.citation_middleware import (
+        from deep_research_agent.agents.citation.citation_middleware import (
             CitationDataMiddleware,
         )
 
@@ -315,12 +315,12 @@ class TestL1ValidationGate:
         assert "Citation Notice" in content or "citation" in content.lower()
 
     def test_max_retries_limits_handler_calls(self) -> None:
-        """MAX_RETRIES=1 means at most 2 handler calls (initial + 1 retry)."""
-        from deep_research_agent.agents.deep_agent.citation.citation_middleware import (
+        """max_retries=1 means at most 2 handler calls (initial + 1 retry)."""
+        from deep_research_agent.agents.citation.citation_middleware import (
             CitationDataMiddleware,
         )
 
-        mw = CitationDataMiddleware()
+        mw = CitationDataMiddleware(max_retries=1)
         worker_msg = _make_tool_message(_make_worker_output_json())
         request = _make_request(state_messages=[worker_msg])
 
@@ -332,11 +332,11 @@ class TestL1ValidationGate:
             return _make_command_result(_make_invalid_cited_report())
 
         mw.wrap_tool_call(request, handler)
-        assert call_count == 2  # initial + MAX_RETRIES(1)
+        assert call_count == 2  # initial + max_retries(1)
 
     def test_retry_includes_correction_instructions(self) -> None:
         """Retry request description includes L1 error details."""
-        from deep_research_agent.agents.deep_agent.citation.citation_middleware import (
+        from deep_research_agent.agents.citation.citation_middleware import (
             CitationDataMiddleware,
         )
 
@@ -370,7 +370,7 @@ class TestAsyncMiddleware:
     @pytest.mark.asyncio
     async def test_async_injects_findings(self) -> None:
         """Async middleware also injects findings."""
-        from deep_research_agent.agents.deep_agent.citation.citation_middleware import (
+        from deep_research_agent.agents.citation.citation_middleware import (
             CitationDataMiddleware,
         )
 
@@ -389,7 +389,7 @@ class TestAsyncMiddleware:
     @pytest.mark.asyncio
     async def test_async_validates_and_retries(self) -> None:
         """Async middleware validates and retries on L1 errors."""
-        from deep_research_agent.agents.deep_agent.citation.citation_middleware import (
+        from deep_research_agent.agents.citation.citation_middleware import (
             CitationDataMiddleware,
         )
 

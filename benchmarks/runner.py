@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from deep_research_agent.agents.deep_agent import build_deep_agent
+from deep_research_agent.agents import build_deep_agent
 from deep_research_agent.benchmarks.benchmark_case import BenchmarkCase, EvaluationResult
 from deep_research_agent.benchmarks.grader import BenchmarkGrader
 from deep_research_agent.config import Settings

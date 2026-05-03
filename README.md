@@ -111,14 +111,24 @@ Copy `.env.example` to `.env` and fill in your keys. See [.env.example](.env.exa
 
 All non-sensitive settings live in [`config/settings.yaml`](config/settings.yaml):
 
+#### Models
+
 | Setting | Description | Default |
-|---------|-------------|---------|
-| `worker_model` | LLM model for workers | `gemini-3-flash-preview` |
-| `planner_model` | LLM model for the supervisor | `gemini-3-flash-preview` |
-| `composer_model` | LLM model for the composer | `gemini-3-flash-preview` |
-| `default_max_parallel_workers` | Max concurrent workers | `10` |
-| `default_recursion_limit` | Max supervisor iterations | `25` |
-| `default_worker_max_tool_calls` | Max tool calls per worker | `40` |
+|---------|-------------|---------:|
+| `planner_model` | LLM model for the Supervisor (orchestrator) | `deepseek-v4-flash` |
+| `worker_model` | LLM model for research workers | `deepseek-v4-flash` |
+| `grader_model` | LLM model for the benchmark grader | `deepseek-v4-flash` |
+
+#### Orchestrator & Worker Limits
+
+| Setting | Description | Default |
+|---------|-------------|---------:|
+| `max_parallel_workers` | Max concurrent worker subagents | `10` |
+| `supervisor_max_turns` | Max Supervisor reasoning turns before forced termination | `100` |
+| `supervisor_max_search_calls` | Max direct `internet_search` calls by the Supervisor | `100` |
+| `worker_max_tool_calls` | Max total tool invocations per worker task | `500` |
+| `worker_max_turns` | Max reasoning turns per worker task | `100` |
+| `worker_max_output_tokens` | Max output tokens per worker response | `8192` |
 
 ## Project Structure
 

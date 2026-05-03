@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import re
 
-from deep_research_agent.agents.deep_agent.citation.models import (
+from deep_research_agent.agents.citation.models import (
     L1ValidationResult,
     Severity,
     ValidationIssue,

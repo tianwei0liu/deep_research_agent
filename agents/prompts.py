@@ -1,91 +1,12 @@
-"""Deep Research Agent built with ``deepagents.create_deep_agent``.
+"""Prompt templates for the deep research agent.
 
-Provides:
-- ``build_deep_agent``      — compile a LangGraph agent with optional checkpointer.
-- ``run_deep_research``     — one-shot query → full report text.
-- ``stream_deep_research``  — async generator yielding structured streaming events.
+Encapsulates all system prompts used by the Supervisor, Worker,
+and Citation Specialist roles in the multi-agent research pipeline.
+
+The Supervisor and Worker prompts include resource-limit placeholders
+that are filled at agent-build time via ``format_*`` class methods.
 """
 
-from __future__ import annotations
-
-import logging
-import os
-import uuid
-from typing import Any, AsyncGenerator, Literal, Optional, TYPE_CHECKING
-
-from dotenv import load_dotenv
-
-if TYPE_CHECKING:
-    from langgraph.graph.state import CompiledStateGraph
-    from langgraph.types import Checkpointer
-
-logger = logging.getLogger(__name__)
-
-
-# ---------------------------------------------------------------------------
-# Config helpers
-# ---------------------------------------------------------------------------
-
-def _load_settings() -> dict[str, Any]:
-    """Load project settings, returning a plain dict of relevant values."""
-    load_dotenv()
-    try:
-        from deep_research_agent.config import Settings
-        s = Settings.load()
-        return {
-            "tavily_api_key": s.tavily_api_key,
-            "planner_model": s.planner_model,
-            "worker_model": s.worker_model,
-        }
-    except Exception:
-        # Fallback: read from environment directly
-        return {
-            "tavily_api_key": os.environ.get("TAVILY_API_KEY", ""),
-            "planner_model": os.environ.get("PLANNER_MODEL", "gemini-3-flash-preview"),
-            "worker_model": os.environ.get("WORKER_MODEL", "gemini-3-flash-preview"),
-        }
-
-
-# ---------------------------------------------------------------------------
-# Tools
-# ---------------------------------------------------------------------------
-
-def _make_internet_search(api_key: str):
-    """Create a Tavily search function compatible with create_deep_agent."""
-    from tavily import TavilyClient
-
-    client = TavilyClient(api_key=api_key)
-
-    def internet_search(
-        query: str,
-        max_results: int = 10,
-        topic: Literal["general", "news", "finance"] = "general",
-        include_raw_content: bool = False,
-    ) -> dict[str, Any]:
-        """Search the internet for current, factual information.
-
-        Args:
-            query: The search query.
-            max_results: Maximum number of results (1-20).
-            topic: Search topic — general, news, or finance.
-            include_raw_content: Whether to include raw page content.
-
-        Returns:
-            Search results dictionary with titles, urls, and content.
-        """
-        return client.search(
-            query,
-            max_results=max_results,
-            include_raw_content=include_raw_content,
-            topic=topic,
-        )
-
-    return internet_search
-
-
-# ---------------------------------------------------------------------------
-# Prompt templates (encapsulated per coding standards)
-# ---------------------------------------------------------------------------
 
 class DeepAgentPrompts:
     """Encapsulated prompt templates for the deep research agent.
@@ -153,15 +74,36 @@ When analyzing a User Query, explicitly select one of these decomposition patter
 
 Before decomposing a query, you MUST classify its complexity in your reasoning:
 
-| Complexity   | Characteristics                                                                                                  | Target Tasks |
-|--------------|------------------------------------------------------------------------------------------------------------------|-----------   |
-| **Simple**   | Single fact, single entity, narrow scope (e.g., "What is the capital of France?")                                | 1-2          |
-| **Moderate** | Multi-faceted single topic, OR comparison of 2-3 entities (e.g., "Compare pricing of Vercel vs Netlify")         | 2-3          |
-| **Complex**  | Broad "State of X", multi-entity comparison (4+), OR requires combining two decomposition patterns               | 3-6          |
-| **Deep**     | Multi-dimensional analysis requiring 3+ decomposition patterns combined                                          | 6-10         |
+| Complexity   | Characteristics                                                              | Action                                      |
+|--------------|------------------------------------------------------------------------------|---------------------------------------------|
+| **Trivial**  | Single fact, yes/no, or definitional question about one entity               | Search directly yourself — do NOT delegate   |
+| **Simple**   | Narrow topic needing 1-3 angles of investigation                             | Delegate 1-3 worker tasks                   |
+| **Moderate** | Multi-faceted single topic, OR comparison of 2-4 entities                    | Delegate 2-4 worker tasks                   |
+| **Complex**  | Broad "State of X", 4+ entity comparison, OR 2 decomposition patterns        | Delegate 4-8 worker tasks                   |
+| **Deep**     | Multi-dimensional analysis requiring 3+ decomposition patterns combined      | Delegate 8-12 worker tasks                  |
 
-**Rules**:
+### Examples
+
+**Trivial** — "今天人民币兑美元的汇率是多少？"
+→ You call `internet_search` directly, then respond. No worker delegation needed.
+
+**Trivial** — "What does RLHF stand for?"
+→ You already know this. Respond directly without any search.
+
+**Simple** — "LangGraph 的 checkpointing 机制是怎么工作的？"
+→ Delegate 1 worker: "Research how LangGraph implements checkpointing, including storage backends and state serialization."
+
+**Moderate** — "Compare pricing of Vercel vs Netlify"
+→ Delegate 2 workers in parallel: one for Vercel pricing, one for Netlify pricing.
+
+**Complex** — "2025年大语言模型在医疗领域的应用现状"
+→ Delegate 4-5 workers: clinical diagnosis, drug discovery, medical imaging, regulatory landscape, key players & products.
+
+### Rules
 - Classify the query complexity FIRST in your reasoning, before creating any tasks.
+- **Trivial queries**: Use `internet_search` yourself or answer from knowledge. Do NOT delegate to workers — it wastes resources.
+- **Simple and above**: You MUST delegate to `research-worker`. Do NOT use `internet_search` yourself as a substitute for proper task decomposition.
+- **Exception**: After receiving worker results, you MAY use `internet_search` once to fact-check a specific contradiction.
 - Match your task count to the classification above. Do NOT create 2 tasks for a Complex query, and do NOT create 8 tasks for a Simple query.
 - For Complex and Deep queries, **combine** decomposition patterns (e.g., Temporal + Functional).
 - More tasks does NOT mean vaguer tasks. Each task must still follow Commandment 3: **One Hypothesis Per Worker**.
@@ -206,6 +148,15 @@ citations yourself following these rules:
 - Every factual claim MUST have at least one citation.
 - Every [N] in text MUST appear in Sources; every Sources entry
   MUST be referenced in text.
+
+## 7. Resource Limits
+- You have at most **{supervisor_max_turns} turns** in total.
+  Each turn = one reasoning step + tool calls.
+- You may call `internet_search` yourself at most **{supervisor_max_search_calls} times**.
+  Use these sparingly — only for Trivial queries or quick fact-checks.
+- Your remaining budget is dynamically updated at the end of the
+  system prompt. When you see a CRITICAL budget warning, you MUST
+  stop immediately and produce the final report.
 """
 
     WORKER: str = """\
@@ -254,6 +205,14 @@ as possible with full source attribution.
 - Search tool ALWAYS returns URLs. Never claim URLs are "not provided".
 - If primary source is paywalled, secondary source is ACCEPTABLE.
 - If you hit a limit, output what you have with a caveat.
+
+## Resource Limits
+- You have at most **{worker_max_search_calls} search calls** in total.
+- You have at most **{worker_max_turns} turns** (each turn = one
+  reasoning step + optional tool calls).
+- When you hit a limit, do **not** make another tool call; output
+  your current findings immediately and add a one-sentence caveat
+  (e.g. "Stopped at limit; N items found.").
 """
 
     CITATION_SPECIALIST: str = """\
@@ -323,208 +282,50 @@ The complete report with inline citations [1], [2]... and a Sources
 section at the end. Nothing else.
 """
 
+    # -----------------------------------------------------------------
+    # Prompt formatting helpers
+    # -----------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Agent factory
-# ---------------------------------------------------------------------------
+    @classmethod
+    def format_supervisor_prompt(
+        cls,
+        *,
+        max_turns: int,
+        max_search_calls: int,
+    ) -> str:
+        """Return the Supervisor system prompt with resource limits filled in.
 
-def build_deep_agent(
-    *,
-    checkpointer: Optional[Checkpointer] = None,
-    **overrides: Any,
-) -> CompiledStateGraph:
-    """Build and return a compiled deep research agent.
+        Args:
+            max_turns: Maximum supervisor reasoning turns before
+                LangGraph terminates the graph.
+            max_search_calls: Maximum number of direct
+                ``internet_search`` calls the supervisor may make.
 
-    Args:
-        checkpointer: Optional LangGraph checkpointer for state persistence
-            and multi-turn conversation support (e.g. ``MemorySaver()``).
-        **overrides: Forwarded to ``create_deep_agent``.
-            - ``model``: Override the main orchestrator model.
-            - ``worker_model``: Override the worker subagent model.
+        Returns:
+            The fully-formatted system prompt string.
+        """
+        return cls.SUPERVISOR.format(
+            supervisor_max_turns=max_turns,
+            supervisor_max_search_calls=max_search_calls,
+        )
 
-    Returns:
-        A compiled LangGraph ``CompiledStateGraph``.
-    """
-    from deepagents import create_deep_agent
+    @classmethod
+    def format_worker_prompt(
+        cls,
+        *,
+        max_search_calls: int,
+        max_turns: int,
+    ) -> str:
+        """Return the Worker system prompt with resource limits filled in.
 
-    from deep_research_agent.agents.deep_agent.citation.citation_middleware import (
-        CitationDataMiddleware,
-    )
-    from deep_research_agent.agents.deep_agent.citation.models import WorkerOutput
+        Args:
+            max_search_calls: Hard cap on total search tool invocations.
+            max_turns: Hard cap on reasoning turns.
 
-    cfg = _load_settings()
-    search_tool = _make_internet_search(cfg["tavily_api_key"])
-
-    main_model = overrides.pop("model", f"deepseek:{cfg['planner_model']}")
-    worker_model = overrides.pop("worker_model", f"deepseek:{cfg['worker_model']}")
-
-    research_subagent: dict[str, Any] = {
-        "name": "research-worker",
-        "description": (
-            "Conducts focused web research on a specific sub-topic. "
-            "Delegate narrow, well-scoped objectives to this agent."
-        ),
-        "system_prompt": DeepAgentPrompts.WORKER,
-        "tools": [search_tool],
-        "model": worker_model,
-        "response_format": WorkerOutput,
-    }
-
-    from langgraph.prebuilt import create_react_agent
-    
-    citation_graph = create_react_agent(
-        worker_model,
-        tools=[],
-        prompt=DeepAgentPrompts.CITATION_SPECIALIST
-    )
-
-    citation_specialist: dict[str, Any] = {
-        "name": "citation-specialist",
-        "description": (
-            "Adds accurate inline citations [1], [2]... to a draft research "
-            "report. Delegate to this agent AFTER all research is complete "
-            "and you have written a draft report. Pass ONLY the draft report "
-            "as the task description — worker findings are auto-injected."
-        ),
-        "runnable": citation_graph,
-    }
-
-    return create_deep_agent(
-        model=main_model,
-        tools=[search_tool],
-        system_prompt=DeepAgentPrompts.SUPERVISOR,
-        subagents=[research_subagent, citation_specialist],
-        middleware=[CitationDataMiddleware()],
-        checkpointer=checkpointer,
-        **overrides,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Streaming runner (async generator)
-# ---------------------------------------------------------------------------
-
-async def stream_deep_research(
-    query: str,
-    *,
-    thread_id: Optional[str] = None,
-    checkpointer: Optional[Checkpointer] = None,
-    **overrides: Any,
-) -> AsyncGenerator[dict[str, Any], None]:
-    """Stream a deep research query, yielding structured events in real time.
-
-    This is the primary entry point for building UIs or CLI tools that need
-    incremental feedback during long-running research.
-
-    Args:
-        query: The research question (or follow-up message for multi-turn).
-        thread_id: Conversation thread ID. When the same ``thread_id`` is
-            reused across calls (with a checkpointer), the agent resumes
-            the previous conversation — enabling multi-turn research.
-            Defaults to a new UUID if not provided.
-        checkpointer: Optional checkpointer for persistence. Required for
-            multi-turn conversations across calls.
-        **overrides: Forwarded to ``build_deep_agent``.
-
-    Yields:
-        Structured event dicts with ``type`` and ``data`` keys:
-        - ``{"type": "status", "data": "..."}`` — lifecycle status messages.
-        - ``{"type": "tool_start", "data": {"name": ..., "input": ...}}``
-        - ``{"type": "tool_end", "data": {"name": ..., "output": ...}}``
-        - ``{"type": "token", "data": "..."}`` — streamed output tokens.
-        - ``{"type": "final_report", "data": "..."}`` — the complete report.
-    """
-    resolved_thread_id = thread_id or str(uuid.uuid4())
-    agent = build_deep_agent(checkpointer=checkpointer, **overrides)
-
-    config = {
-        "configurable": {"thread_id": resolved_thread_id},
-        "recursion_limit": 100,
-    }
-
-    yield {"type": "status", "data": f"Starting research (thread={resolved_thread_id})"}
-
-    # We only stream tokens from the top-level supervisor to avoid interleaving
-    # worker/citation specialist thoughts.
-    async for event in agent.astream_events(
-        {"messages": [("user", query)]},
-        config=config,
-        version="v2",
-    ):
-        kind = event.get("event", "")
-
-        if kind == "on_tool_start":
-            tool_name = event.get("name", "unknown")
-            tool_input = event.get("data", {}).get("input", {})
-            yield {"type": "tool_start", "data": {"name": tool_name, "input": tool_input}}
-
-        elif kind == "on_tool_end":
-            tool_name = event.get("name", "unknown")
-            tool_output = event.get("data", {}).get("output", "")
-            # Truncate large tool outputs for streaming consumers
-            output_str = str(tool_output)
-            if len(output_str) > 500:
-                output_str = output_str[:500] + "..."
-            yield {"type": "tool_end", "data": {"name": tool_name, "output": output_str}}
-
-        elif kind == "on_chat_model_stream":
-            # Only stream the top-level agent to avoid interleaved garbage output
-            langgraph_node = event.get("metadata", {}).get("langgraph_node")
-            if langgraph_node == "agent":
-                chunk = event.get("data", {}).get("chunk")
-                if chunk and hasattr(chunk, "content") and chunk.content:
-                    token = chunk.content
-                    if isinstance(token, str):
-                        yield {"type": "token", "data": token}
-
-    # Extract final report reliably from the final graph state.
-    # The supervisor is instructed to output the final report as its final response.
-    try:
-        state = await agent.aget_state(config)
-        messages = state.values.get("messages", [])
-        if messages:
-            last_msg = messages[-1]
-            if hasattr(last_msg, "content") and last_msg.content:
-                yield {"type": "final_report", "data": last_msg.content}
-    except Exception as e:
-        logger.error("Failed to extract final report from state: %s", e)
-
-    yield {"type": "status", "data": "Research complete"}
-
-
-# ---------------------------------------------------------------------------
-# Convenience one-shot runner
-# ---------------------------------------------------------------------------
-
-async def run_deep_research(
-    query: str,
-    *,
-    thread_id: Optional[str] = None,
-    checkpointer: Optional[Checkpointer] = None,
-    **overrides: Any,
-) -> str:
-    """Run a deep research query end-to-end, return the final report text.
-
-    This is a convenience wrapper around ``stream_deep_research`` that
-    consumes all events and returns the final report.
-
-    Args:
-        query: The research question.
-        thread_id: Optional thread ID for multi-turn conversations.
-        checkpointer: Optional checkpointer for state persistence.
-        **overrides: Forwarded to ``build_deep_agent``.
-
-    Returns:
-        The final assistant message content (markdown report).
-    """
-    report = ""
-    async for event in stream_deep_research(
-        query,
-        thread_id=thread_id,
-        checkpointer=checkpointer,
-        **overrides,
-    ):
-        if event["type"] == "final_report":
-            report = event["data"]
-
-    return report
+        Returns:
+            The fully-formatted system prompt string.
+        """
+        return cls.WORKER.format(
+            worker_max_search_calls=max_search_calls,
+            worker_max_turns=max_turns,
+        )

@@ -6,14 +6,14 @@ Covers acceptance criteria AC-L1-01 through AC-L1-11 from
 
 import pytest
 
-from deep_research_agent.agents.deep_agent.citation.models import Severity
+from deep_research_agent.agents.citation.models import Severity
 
 
 class TestCitationStructureValidator:
     """Tests for CitationStructureValidator.validate()."""
 
     def _make_validator(self):
-        from deep_research_agent.agents.deep_agent.citation.structure_validator import (
+        from deep_research_agent.agents.citation.structure_validator import (
             CitationStructureValidator,
         )
         return CitationStructureValidator()
