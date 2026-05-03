@@ -203,6 +203,7 @@ async def stream_deep_research(
     yield {"type": "status", "data": f"Starting research (thread={resolved_thread_id})"}
 
     timed_out = False
+    root_run_id_yielded = False
     try:
         cm = asyncio.timeout(effective_timeout)
         async with cm:
@@ -212,6 +213,12 @@ async def stream_deep_research(
                 version="v2",
             ):
                 kind = event.get("event", "")
+
+                if not root_run_id_yielded and kind == "on_chain_start":
+                    run_id = event.get("run_id")
+                    if run_id:
+                        yield {"type": "run_id", "data": run_id}
+                        root_run_id_yielded = True
 
                 if kind == "on_tool_start":
                     tool_name = event.get("name", "unknown")

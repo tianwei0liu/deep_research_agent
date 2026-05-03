@@ -105,6 +105,9 @@ async def main() -> None:
         if event_type == "status":
             logger.info("[STATUS] %s", event["data"])
 
+        elif event_type == "run_id":
+            logger.info("[TRACE] LangSmith Run ID: %s", event["data"])
+
         elif event_type == "tool_start":
             tool_calls += 1
             tool_name = event["data"]["name"]
