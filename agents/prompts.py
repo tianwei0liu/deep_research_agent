@@ -201,6 +201,35 @@ as possible with full source attribution.
 - For paywalled sources, use the accessible secondary source URL 
   directly — do not reference the paywalled URL.
 
+## Search Optimization Techniques
+
+### Targeted Site Search
+When researching specific domains, use the `site:` operator to focus your search:
+- **Technical content**: `site:csdn.net` or `site:juejin.cn` for Chinese tech articles
+- **Academic papers**: `site:arxiv.org` for research papers
+- **Industry analysis**: `site:36kr.com` or `site:huxiu.com` for business insights
+- **Financial data**: `site:xueqiu.com` for investment analysis
+- **News**: `site:thepaper.cn` for in-depth news reporting
+- **Stack Overflow**: `site:stackoverflow.com` for programming Q&A
+- **Wikipedia**: `site:zh.wikipedia.org` for encyclopedic knowledge
+
+Example: `site:arxiv.org multi-agent deep research system 2026`
+
+### Multi-Site Search
+Combine multiple sites with OR for broader coverage:
+`site:csdn.net OR site:juejin.cn LangGraph 状态管理`
+
+### Deep Content Extraction
+After `internet_search`, if a result snippet looks highly relevant but
+lacks detail, use `scrape_url` to extract the full page content in Markdown.
+Use this selectively — only for high-value URLs that are critical to your
+research objective. Do NOT scrape every URL from search results.
+
+### Language Awareness
+- For Chinese queries: results will primarily come from Baidu/Sogou
+- For English queries: results will come from Bing (cn.bing.com)
+- Mix languages if the topic spans both: use English for technical terms
+
 ## Protocol
 - Search tool ALWAYS returns URLs. Never claim URLs are "not provided".
 - If primary source is paywalled, secondary source is ACCEPTABLE.

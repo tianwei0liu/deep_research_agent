@@ -20,6 +20,7 @@ from deep_research_agent.agents.prompts import DeepAgentPrompts
 from deep_research_agent.agents.tools import (
     load_settings,
     make_internet_search,
+    make_scrape_url,
 )
 
 if TYPE_CHECKING:
@@ -37,6 +38,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 _load_settings = load_settings
 _make_internet_search = make_internet_search
+_make_scrape_url = make_scrape_url
 
 
 # ---------------------------------------------------------------------------
@@ -68,7 +70,9 @@ def build_deep_agent(
     from deep_research_agent.agents.citation.models import WorkerOutput
 
     cfg = _load_settings()
-    search_tool = _make_internet_search(cfg["tavily_api_key"])
+    search_config = cfg["search_config"]
+    search_tool = _make_internet_search(search_config)
+    scrape_tool = _make_scrape_url(search_config)
 
     # --- Resolve orchestration limits from config ---
     supervisor_max_turns = cfg.get("supervisor_max_turns", 35)
@@ -109,7 +113,7 @@ def build_deep_agent(
             "Delegate narrow, well-scoped objectives to this agent."
         ),
         "system_prompt": worker_prompt,
-        "tools": [search_tool],
+        "tools": [search_tool, scrape_tool],
         "model": worker_model,
         "response_format": WorkerOutput,
     }

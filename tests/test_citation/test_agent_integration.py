@@ -15,10 +15,11 @@ import pytest
 # but create_deep_agent is imported inside build_deep_agent from deepagents.
 _SETTINGS_PATCH = "deep_research_agent.agents.agent._load_settings"
 _SEARCH_PATCH = "deep_research_agent.agents.agent._make_internet_search"
+_SCRAPE_PATCH = "deep_research_agent.agents.agent._make_scrape_url"
 _CREATE_PATCH = "deepagents.create_deep_agent"
 
 _FAKE_SETTINGS: dict[str, Any] = {
-    "tavily_api_key": "fake",
+    "search_config": MagicMock(),
     "planner_model": "test-model",
     "worker_model": "test-model",
     # Orchestration limits (mirrors tools.load_settings output)
@@ -38,10 +39,12 @@ class TestBuildDeepAgent:
 
     @patch(_SETTINGS_PATCH, return_value=_FAKE_SETTINGS)
     @patch(_SEARCH_PATCH, return_value=MagicMock())
+    @patch(_SCRAPE_PATCH, return_value=MagicMock())
     @patch(_CREATE_PATCH, return_value=MagicMock())
     def test_research_worker_has_response_format(
         self,
         mock_create: MagicMock,
+        mock_scrape: MagicMock,
         mock_search: MagicMock,
         mock_settings: MagicMock,
     ) -> None:
@@ -59,10 +62,12 @@ class TestBuildDeepAgent:
 
     @patch(_SETTINGS_PATCH, return_value=_FAKE_SETTINGS)
     @patch(_SEARCH_PATCH, return_value=MagicMock())
+    @patch(_SCRAPE_PATCH, return_value=MagicMock())
     @patch(_CREATE_PATCH, return_value=MagicMock())
     def test_citation_specialist_registered(
         self,
         mock_create: MagicMock,
+        mock_scrape: MagicMock,
         mock_search: MagicMock,
         mock_settings: MagicMock,
     ) -> None:
@@ -81,10 +86,12 @@ class TestBuildDeepAgent:
 
     @patch(_SETTINGS_PATCH, return_value=_FAKE_SETTINGS)
     @patch(_SEARCH_PATCH, return_value=MagicMock())
+    @patch(_SCRAPE_PATCH, return_value=MagicMock())
     @patch(_CREATE_PATCH, return_value=MagicMock())
     def test_citation_middleware_registered(
         self,
         mock_create: MagicMock,
+        mock_scrape: MagicMock,
         mock_search: MagicMock,
         mock_settings: MagicMock,
     ) -> None:
@@ -102,10 +109,12 @@ class TestBuildDeepAgent:
 
     @patch(_SETTINGS_PATCH, return_value=_FAKE_SETTINGS)
     @patch(_SEARCH_PATCH, return_value=MagicMock())
+    @patch(_SCRAPE_PATCH, return_value=MagicMock())
     @patch(_CREATE_PATCH, return_value=MagicMock())
     def test_two_subagents_registered(
         self,
         mock_create: MagicMock,
+        mock_scrape: MagicMock,
         mock_search: MagicMock,
         mock_settings: MagicMock,
     ) -> None:

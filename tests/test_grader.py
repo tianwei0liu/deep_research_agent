@@ -33,6 +33,7 @@ def _make_settings(**overrides) -> Settings:
         worker_max_output_tokens=8192,
         citation_max_retries=5,
         research_timeout_seconds=600,
+        searxng_base_url="http://localhost:8080",
     )
     defaults.update(overrides)
     return Settings(**defaults)

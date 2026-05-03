@@ -14,7 +14,10 @@ grader_temperature: 0.0
 grader_thinking_level: "medium"
 grader_google_search_enabled: true
 
-# Tavily Search
+# Search Service (SearXNG)
+searxng_base_url: "http://localhost:8080"
+
+# Tavily Search (DEPRECATED — replaced by SearXNG in search_service)
 tavily_search_url: "https://api.tavily.com/search"
 tavily_max_result_chars: 12000
 

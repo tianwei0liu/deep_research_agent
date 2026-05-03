@@ -8,4 +8,9 @@ pyyaml>=6.0
 
 # Deep Agent (create_deep_agent)
 deepagents @ git+https://github.com/langchain-ai/deepagents.git#subdirectory=libs/deepagents
-tavily-python
+
+# Search Service (self-hosted MCP search via SearXNG + Playwright)
+pydantic-settings>=2.0
+playwright>=1.40.0
+markdownify>=0.11.0
+mcp[cli]>=1.20.0

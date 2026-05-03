@@ -55,6 +55,9 @@ class Settings:
     # --- Runtime Safety ---
     research_timeout_seconds: int
 
+    # --- Search Service ---
+    searxng_base_url: str
+
     def require_gemini_api_key(self) -> str:
         if not self.gemini_api_key:
             raise ValueError("GOOGLE_GEMINI_API_KEY is not set")
@@ -133,4 +136,8 @@ class Settings:
             worker_max_output_tokens=int(yaml_data.get("worker_max_output_tokens", 8192)),
             citation_max_retries=int(yaml_data.get("citation_max_retries", 5)),
             research_timeout_seconds=int(yaml_data.get("research_timeout_seconds", 600)),
+            searxng_base_url=cls._env(
+                "SEARCH_SEARXNG_BASE_URL",
+                yaml_data.get("searxng_base_url", "http://localhost:8080"),
+            ),
         )
