@@ -19,7 +19,7 @@ class TestSearchServiceConfig:
         assert cfg.searxng_base_url == "http://localhost:8080"
         assert cfg.searxng_timeout_seconds == 8.0
         assert cfg.searxng_max_retries == 3
-        assert cfg.browser_max_concurrency == 3
+        assert cfg.browser_max_concurrency == 10
         assert cfg.browser_max_requests_per_instance == 100
         assert cfg.browser_memory_limit_mb == 512
         assert cfg.cache_backend == "null"

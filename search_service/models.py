@@ -28,6 +28,8 @@ class SearchEngine(str, Enum):
     WEIBO = "weibo"
     WEIXIN = "weixin"
     GITHUB = "github"
+    STARTPAGE = "startpage"
+    BOCHA = "bocha"
 
 
 class SearchResultItem(BaseModel):

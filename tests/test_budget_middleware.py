@@ -2,7 +2,7 @@
 
 Verifies:
 - AIMessage counting logic.
-- Budget message formatting (NORMAL vs CRITICAL).
+- Budget message formatting (NORMAL → ELEVATED → CRITICAL → OVERRUN).
 - System message injection via wrap_model_call / awrap_model_call.
 """
 
@@ -93,6 +93,10 @@ class TestBuildBudgetMessage:
         assert "Remaining turns: 30" in msg
         assert "NORMAL" in msg
         assert "CRITICAL" not in msg
+        assert "ELEVATED" not in msg
+        assert "OVERRUN" not in msg
+        # Consequence warning should be present even in NORMAL
+        assert "forcibly terminate" in msg
 
     def test_critical_at_threshold(self) -> None:
         """remaining = 35 - 32 = 3 → exactly at threshold → CRITICAL."""
@@ -111,20 +115,42 @@ class TestBuildBudgetMessage:
         assert "Remaining turns: 0" in msg
         assert "CRITICAL" in msg
 
-    def test_beyond_max_clamps_to_zero(self) -> None:
-        """If somehow called beyond max_turns, remaining should be 0."""
+    def test_beyond_max_triggers_overrun(self) -> None:
+        """Beyond max_turns → OVERRUN (not CRITICAL)."""
         msg = self.mw._build_budget_message(current_turn=40)
         assert "Remaining turns: 0" in msg
-        assert "CRITICAL" in msg
+        assert "OVERRUN" in msg
+        assert "EXCEEDED" in msg
+        assert "CRITICAL" not in msg
 
     def test_custom_threshold(self) -> None:
         mw = BudgetTrackingMiddleware(max_turns=20, critical_threshold=5)
         # Turn 15 → remaining = 5 → at threshold → CRITICAL
         msg = mw._build_budget_message(current_turn=15)
         assert "CRITICAL" in msg
-        # Turn 14 → remaining = 6 → above threshold → NORMAL
+        # Turn 14 → remaining = 6 → above threshold, but 70% used → ELEVATED
         msg = mw._build_budget_message(current_turn=14)
-        assert "NORMAL" in msg
+        assert "ELEVATED" in msg
+
+    def test_elevated_at_halfway(self) -> None:
+        """Turn 18/35 → 51% used → ELEVATED."""
+        msg = self.mw._build_budget_message(current_turn=18)
+        assert "ELEVATED" in msg
+        assert "wrapping up" in msg
+        assert "CRITICAL" not in msg
+
+    def test_elevated_boundary(self) -> None:
+        """Exactly 50% usage → ELEVATED."""
+        mw = BudgetTrackingMiddleware(max_turns=10, critical_threshold=3)
+        msg = mw._build_budget_message(current_turn=5)
+        assert "ELEVATED" in msg
+
+    def test_overrun_explicit(self) -> None:
+        """current_turn > max_turns → OVERRUN."""
+        msg = self.mw._build_budget_message(current_turn=36)
+        assert "OVERRUN" in msg
+        assert "FORBIDDEN" in msg
+        assert "CRITICAL" not in msg
 
 
 # ---------------------------------------------------------------------------

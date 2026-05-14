@@ -1,238 +1,147 @@
-"""Integration tests for agents/tools.py ↔ search_service wiring.
+"""Integration tests for MCP client and tool loading.
 
 Tests verify that:
-- ``make_internet_search`` returns an async callable with Tavily-compat output
-- ``make_scrape_url`` returns an async callable with ScrapeResponse output
-- ``load_settings`` includes ``search_config``
+- ``MCPSearchClient`` correctly manages MCP session lifecycle
+- ``load_settings`` returns expected configuration
+- MCP tool filtering works correctly
 """
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from search_service.config import SearchServiceConfig
-from search_service.models import SearchResponse, SearchResultItem, SearchEngine, ScrapeResponse
+from deep_research_agent.agents.mcp_client import MCPSearchClient
 
 
 # ---------------------------------------------------------------------------
-# Fixtures
+# MCPSearchClient
 # ---------------------------------------------------------------------------
 
-@pytest.fixture()
-def search_config() -> SearchServiceConfig:
-    """Minimal SearchServiceConfig for testing."""
-    return SearchServiceConfig(searxng_base_url="http://test:8080")
+class TestMCPSearchClient:
+    """Tests for ``MCPSearchClient`` lifecycle and tool access."""
 
+    def test_default_server_params(self) -> None:
+        """Client uses python -m search_service by default."""
+        import sys
 
-def _make_fake_search_response(query: str = "test") -> SearchResponse:
-    """Create a realistic SearchResponse for mocking."""
-    return SearchResponse(
-        query=query,
-        results=[
-            SearchResultItem(
-                title="Test Result 1",
-                url="https://example.com/1",
-                content="First result content",
-                source_engine=SearchEngine.BAIDU,
-            ),
-            SearchResultItem(
-                title="Test Result 2",
-                url="https://example.com/2",
-                content="Second result content",
-                source_engine=SearchEngine.SOGOU,
-            ),
-        ],
-        result_count=2,
-        search_time_ms=150,
-        engines_used=["baidu", "sogou"],
-    )
+        client = MCPSearchClient()
+        assert client._server_params.command == sys.executable
+        assert client._server_params.args == ["-m", "search_service"]
 
-
-def _make_fake_scrape_response(url: str = "https://example.com") -> ScrapeResponse:
-    """Create a realistic ScrapeResponse for mocking."""
-    return ScrapeResponse(
-        url=url,
-        title="Example Page",
-        content="# Example\n\nPage content in markdown.",
-        content_length=38,
-    )
-
-
-# ---------------------------------------------------------------------------
-# make_internet_search
-# ---------------------------------------------------------------------------
-
-class TestMakeInternetSearch:
-    """Tests for ``make_internet_search`` factory."""
-
-    def test_returns_callable(self, search_config: SearchServiceConfig) -> None:
-        """Factory returns a callable (async function)."""
-        from deep_research_agent.agents.tools import make_internet_search
-
-        tool = make_internet_search(search_config)
-        assert callable(tool)
-
-    def test_function_name_is_internet_search(self, search_config: SearchServiceConfig) -> None:
-        """Inner function name is 'internet_search' for LangGraph ToolNode."""
-        from deep_research_agent.agents.tools import make_internet_search
-
-        tool = make_internet_search(search_config)
-        assert tool.__name__ == "internet_search"
-
-    def test_function_is_async(self, search_config: SearchServiceConfig) -> None:
-        """Inner function is a coroutine function."""
-        from deep_research_agent.agents.tools import make_internet_search
-
-        tool = make_internet_search(search_config)
-        assert asyncio.iscoroutinefunction(tool)
+    def test_custom_server_params(self) -> None:
+        """Client accepts custom command and args."""
+        client = MCPSearchClient(
+            server_command="/usr/bin/python3",
+            server_args=["-m", "my_server"],
+        )
+        assert client._server_params.command == "/usr/bin/python3"
+        assert client._server_params.args == ["-m", "my_server"]
 
     @pytest.mark.asyncio
-    async def test_returns_tavily_compatible_format(self, search_config: SearchServiceConfig) -> None:
-        """Output dict has 'query' and 'results' keys with correct structure."""
-        from deep_research_agent.agents.tools import make_internet_search
-
-        fake_response = _make_fake_search_response("AI agent")
+    async def test_aenter_loads_tools(self) -> None:
+        """__aenter__ spawns server and discovers tools."""
+        fake_tools = [
+            MagicMock(name="web_search"),
+            MagicMock(name="scrape_url"),
+        ]
+        fake_tools[0].name = "web_search"
+        fake_tools[1].name = "scrape_url"
 
         with patch(
-            "search_service.backends.base.SearchRouter.search",
+            "deep_research_agent.agents.mcp_client.stdio_client",
+        ) as mock_stdio, patch(
+            "deep_research_agent.agents.mcp_client.ClientSession",
+        ) as mock_session_cls, patch(
+            "deep_research_agent.agents.mcp_client.load_mcp_tools",
             new_callable=AsyncMock,
-            return_value=fake_response,
+            return_value=fake_tools,
         ):
-            tool = make_internet_search(search_config)
-            result = await tool("AI agent", max_results=5)
+            # Mock stdio context manager
+            mock_stdio_cm = AsyncMock()
+            mock_stdio_cm.__aenter__ = AsyncMock(
+                return_value=(MagicMock(), MagicMock()),
+            )
+            mock_stdio_cm.__aexit__ = AsyncMock(return_value=None)
+            mock_stdio.return_value = mock_stdio_cm
 
-        assert isinstance(result, dict)
-        assert "query" in result
-        assert "results" in result
-        assert result["query"] == "AI agent"
-        assert len(result["results"]) == 2
+            # Mock session context manager
+            mock_session = AsyncMock()
+            mock_session.initialize = AsyncMock()
+            mock_session_cm = AsyncMock()
+            mock_session_cm.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session_cm.__aexit__ = AsyncMock(return_value=None)
+            mock_session_cls.return_value = mock_session_cm
 
-        # Each result has title, url, content
-        for r in result["results"]:
-            assert "title" in r
-            assert "url" in r
-            assert "content" in r
+            client = MCPSearchClient()
+            result = await client.__aenter__()
 
-    @pytest.mark.asyncio
-    async def test_news_topic_routes_to_bing(self, search_config: SearchServiceConfig) -> None:
-        """topic='news' passes engines=['bing'] to the router."""
-        from deep_research_agent.agents.tools import make_internet_search
-
-        fake_response = _make_fake_search_response("breaking news")
-
-        with patch(
-            "search_service.backends.base.SearchRouter.search",
-            new_callable=AsyncMock,
-            return_value=fake_response,
-        ) as mock_search:
-            tool = make_internet_search(search_config)
-            await tool("breaking news", topic="news")
-
-        _, kwargs = mock_search.call_args
-        assert kwargs.get("engines") == ["bing"]
+            assert result is client
+            assert len(client.get_tools()) == 2
 
     @pytest.mark.asyncio
-    async def test_general_topic_no_engine_filter(self, search_config: SearchServiceConfig) -> None:
-        """topic='general' passes engines=None (use SearXNG defaults)."""
-        from deep_research_agent.agents.tools import make_internet_search
+    async def test_aexit_cleans_up(self) -> None:
+        """__aexit__ closes session and stdio transport."""
+        client = MCPSearchClient()
 
-        fake_response = _make_fake_search_response("test")
+        # Simulate entered state
+        mock_session_cm = AsyncMock()
+        mock_session_cm.__aexit__ = AsyncMock(return_value=None)
+        client._session_cm = mock_session_cm
 
-        with patch(
-            "search_service.backends.base.SearchRouter.search",
-            new_callable=AsyncMock,
-            return_value=fake_response,
-        ) as mock_search:
-            tool = make_internet_search(search_config)
-            await tool("test", topic="general")
+        mock_stdio_cm = AsyncMock()
+        mock_stdio_cm.__aexit__ = AsyncMock(return_value=None)
+        client._stdio_cm = mock_stdio_cm
 
-        _, kwargs = mock_search.call_args
-        assert kwargs.get("engines") is None
+        client._session = MagicMock()
+        client._tools = [MagicMock()]
+        client._tool_map = {"test": MagicMock()}
 
+        await client.__aexit__(None, None, None)
 
-# ---------------------------------------------------------------------------
-# make_scrape_url
-# ---------------------------------------------------------------------------
+        mock_session_cm.__aexit__.assert_called_once()
+        mock_stdio_cm.__aexit__.assert_called_once()
+        assert client._tools == []
+        assert client._tool_map == {}
+        assert client._session is None
 
-class TestMakeScrapeUrl:
-    """Tests for ``make_scrape_url`` factory."""
+    def test_get_tools_returns_all(self) -> None:
+        """get_tools() without names returns all tools."""
+        client = MCPSearchClient()
+        tool_a = MagicMock()
+        tool_a.name = "a"
+        tool_b = MagicMock()
+        tool_b.name = "b"
+        client._tools = [tool_a, tool_b]
+        client._tool_map = {"a": tool_a, "b": tool_b}
 
-    def test_returns_callable(self, search_config: SearchServiceConfig) -> None:
-        """Factory returns a callable."""
-        from deep_research_agent.agents.tools import make_scrape_url
+        result = client.get_tools()
+        assert len(result) == 2
 
-        tool = make_scrape_url(search_config)
-        assert callable(tool)
+    def test_get_tools_filters_by_name(self) -> None:
+        """get_tools(names=[...]) returns only matching tools."""
+        client = MCPSearchClient()
+        tool_a = MagicMock()
+        tool_a.name = "web_search"
+        tool_b = MagicMock()
+        tool_b.name = "scrape_url"
+        client._tools = [tool_a, tool_b]
+        client._tool_map = {"web_search": tool_a, "scrape_url": tool_b}
 
-    def test_function_name_is_scrape_url(self, search_config: SearchServiceConfig) -> None:
-        """Inner function name is 'scrape_url'."""
-        from deep_research_agent.agents.tools import make_scrape_url
+        result = client.get_tools(names=["web_search"])
+        assert len(result) == 1
+        assert result[0].name == "web_search"
 
-        tool = make_scrape_url(search_config)
-        assert tool.__name__ == "scrape_url"
+    def test_get_tools_raises_on_missing_name(self) -> None:
+        """get_tools raises ValueError for unknown tool names."""
+        client = MCPSearchClient()
+        client._tools = []
+        client._tool_map = {}
 
-    def test_function_is_async(self, search_config: SearchServiceConfig) -> None:
-        """Inner function is a coroutine function."""
-        from deep_research_agent.agents.tools import make_scrape_url
-
-        tool = make_scrape_url(search_config)
-        assert asyncio.iscoroutinefunction(tool)
-
-    @pytest.mark.asyncio
-    async def test_returns_scrape_response_dict(self, search_config: SearchServiceConfig) -> None:
-        """Output dict matches ScrapeResponse schema."""
-        from deep_research_agent.agents.tools import make_scrape_url
-
-        fake_response = _make_fake_scrape_response("https://example.com/article")
-
-        with patch(
-            "search_service.browser.pool.BrowserPool.start",
-            new_callable=AsyncMock,
-        ), patch(
-            "search_service.backends.page_scraper.PageScraper.scrape",
-            new_callable=AsyncMock,
-            return_value=fake_response,
-        ):
-            tool = make_scrape_url(search_config)
-            result = await tool("https://example.com/article")
-
-        assert isinstance(result, dict)
-        assert result["url"] == "https://example.com/article"
-        assert result["title"] == "Example Page"
-        assert "content" in result
-        assert "content_length" in result
-
-    @pytest.mark.asyncio
-    async def test_lazy_browser_pool_start(self, search_config: SearchServiceConfig) -> None:
-        """BrowserPool.start() is called only on first invocation."""
-        from deep_research_agent.agents.tools import make_scrape_url
-
-        fake_response = _make_fake_scrape_response()
-
-        with patch(
-            "search_service.browser.pool.BrowserPool.start",
-            new_callable=AsyncMock,
-        ) as mock_start, patch(
-            "search_service.backends.page_scraper.PageScraper.scrape",
-            new_callable=AsyncMock,
-            return_value=fake_response,
-        ):
-            tool = make_scrape_url(search_config)
-
-            # Not started yet
-            mock_start.assert_not_called()
-
-            # First call triggers start
-            await tool("https://example.com/1")
-            assert mock_start.call_count == 1
-
-            # Second call does NOT restart
-            await tool("https://example.com/2")
-            assert mock_start.call_count == 1
+        with pytest.raises(ValueError, match="not found"):
+            client.get_tools(names=["nonexistent"])
 
 
 # ---------------------------------------------------------------------------
@@ -242,22 +151,22 @@ class TestMakeScrapeUrl:
 class TestLoadSettings:
     """Tests for ``load_settings`` integration."""
 
-    def test_returns_search_config(self) -> None:
-        """load_settings always includes a SearchServiceConfig."""
+    def test_returns_model_config(self) -> None:
+        """load_settings returns planner and worker model names."""
         with patch.dict("os.environ", {}, clear=False):
             from deep_research_agent.agents.tools import load_settings
 
             result = load_settings()
 
-        assert "search_config" in result
-        assert isinstance(result["search_config"], SearchServiceConfig)
+        assert "planner_model" in result
+        assert "worker_model" in result
 
-    def test_no_tavily_key_required(self) -> None:
-        """load_settings no longer requires TAVILY_API_KEY."""
+    def test_no_search_config_key(self) -> None:
+        """load_settings no longer includes search_config (handled by MCP server)."""
         with patch.dict("os.environ", {}, clear=False):
             from deep_research_agent.agents.tools import load_settings
 
             result = load_settings()
 
-        # tavily_api_key should NOT be in the result
-        assert "tavily_api_key" not in result
+        # search_config was removed — MCP server manages its own config
+        assert "search_config" not in result

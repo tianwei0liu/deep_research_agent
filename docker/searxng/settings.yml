@@ -12,7 +12,7 @@ search:
   formats:
     - html
     - json
-  default_lang: zh-CN
+  default_lang: auto
   autocomplete: ""
   safe_search: 0
 

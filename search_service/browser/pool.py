@@ -83,7 +83,7 @@ class BrowserPool:
     @asynccontextmanager
     async def acquire(
         self,
-        timeout: float = 10.0,
+        timeout: float = 30.0,
         cookies: Optional[list[dict]] = None,
     ) -> AsyncGenerator[BrowserContext, None]:
         """Acquire a BrowserContext from the pool.

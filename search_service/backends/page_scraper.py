@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import re
+from urllib.parse import urlparse
 from typing import Optional
 
 from search_service.browser.pool import BrowserPool
@@ -32,6 +33,20 @@ class PageScraper:
         ".comment", ".comments",
         "script", "style", "iframe",
     ]
+
+    # File extensions and domains that are not scrapable HTML pages.
+    _NON_HTML_EXTENSIONS = {
+        ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico",
+        ".bmp", ".tiff", ".avif",
+        ".mp4", ".webm", ".mov", ".avi", ".mkv",
+        ".mp3", ".wav", ".ogg", ".flac",
+        ".pdf", ".zip", ".tar", ".gz", ".bz2", ".xz", ".7z",
+        ".woff", ".woff2", ".ttf", ".otf", ".eot",
+        ".bin", ".exe", ".dmg", ".iso",
+    }
+    _NON_HTML_DOMAINS = {
+        "img.shields.io",  # SVG badges
+    }
 
     def __init__(self, browser_pool: BrowserPool) -> None:
         self._pool = browser_pool
@@ -63,6 +78,7 @@ class PageScraper:
         Raises:
             ContentExtractionError: On extraction failure.
         """
+        self._validate_url(url)
         async with self._pool.acquire() as context:
             page = await context.new_page()
             try:
@@ -100,15 +116,48 @@ class PageScraper:
     async def _remove_noise(self, page) -> None:
         """Remove non-content elements (nav, sidebar, ads, etc.)."""
         for selector in self._NOISE_SELECTORS:
+            # Use backticks for JS string to avoid quote conflicts with selectors like [role='navigation']
             await page.evaluate(f"""
-                document.querySelectorAll('{selector}')
+                document.querySelectorAll(`{selector}`)
                     .forEach(el => el.remove());
             """)
+
+    def _validate_url(self, url: str) -> None:
+        """Reject URLs that point to non-HTML resources.
+
+        Args:
+            url: Target URL to validate.
+
+        Raises:
+            ContentExtractionError: If the URL points to a known
+                non-scrapable resource (image, video, binary, etc.).
+        """
+        parsed = urlparse(url)
+        path_lower = parsed.path.lower()
+
+        # Check domain blocklist (e.g. img.shields.io serves SVGs)
+        if parsed.hostname and parsed.hostname in self._NON_HTML_DOMAINS:
+            raise ContentExtractionError(
+                url,
+                f"Non-HTML domain: {parsed.hostname} serves non-scrapable "
+                f"content (badges, images). Skip this URL.",
+            )
+
+        # Check file extension
+        for ext in self._NON_HTML_EXTENSIONS:
+            if path_lower.endswith(ext):
+                raise ContentExtractionError(
+                    url,
+                    f"Non-HTML resource (extension: {ext}). "
+                    f"Cannot extract text from binary/media files.",
+                )
 
     async def _extract_main_content(self, page) -> str:
         """Extract main content HTML.
 
-        Priority: <article> → <main> → highest text-density div.
+        Priority: <article> → <main> → highest text-density div → <body>.
+        Falls back to empty string when document.body is absent
+        (e.g. SVG or XML documents).
         """
         article = await page.query_selector("article")
         if article:
@@ -118,7 +167,8 @@ class PageScraper:
         if main:
             return await main.inner_html()
 
-        # Readability heuristic: find div with highest text density
+        # Readability heuristic: find div with highest text density.
+        # Guard against null document.body (SVG/XML responses).
         result = await page.evaluate("""
             () => {
                 const divs = document.querySelectorAll('div, section');
@@ -131,10 +181,12 @@ class PageScraper:
                         best = div;
                     }
                 }
-                return best ? best.innerHTML : document.body.innerHTML;
+                if (best) return best.innerHTML;
+                if (document.body) return document.body.innerHTML;
+                return '';
             }
         """)
-        return result
+        return result or ""
 
     @staticmethod
     def _html_to_markdown(html: str) -> str:

@@ -176,15 +176,19 @@ class TestBrowserPool:
 class TestStealthInjector:
     """StealthInjector: load_script caching and error handling."""
 
-    def test_load_script_file_not_found(self, tmp_path) -> None:
-        """Raises FileNotFoundError when stealth.min.js is missing."""
-        original = StealthInjector._SCRIPT_PATH
+    def test_load_script_file_not_found_returns_fallback(self, tmp_path) -> None:
+        """Returns minimal fallback script when stealth.min.js is missing."""
+        original_path = StealthInjector._SCRIPT_PATH
+        original_cached = StealthInjector._cached_script
         StealthInjector._SCRIPT_PATH = tmp_path / "nonexistent.js"
+        StealthInjector._cached_script = None
         try:
-            with pytest.raises(FileNotFoundError, match="stealth.min.js not found"):
-                StealthInjector.load_script()
+            result = StealthInjector.load_script()
+            assert "webdriver" in result
+            assert "undefined" in result
         finally:
-            StealthInjector._SCRIPT_PATH = original
+            StealthInjector._SCRIPT_PATH = original_path
+            StealthInjector._cached_script = original_cached
 
     def test_load_script_caching(self, tmp_path) -> None:
         """Script is read once and cached."""

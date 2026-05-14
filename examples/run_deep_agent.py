@@ -49,6 +49,20 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Enable debug logging.",
     )
+    parser.add_argument(
+        "--persona",
+        type=str,
+        default=None,
+        help=(
+            "Activate a persona analysis framework "
+            "(e.g., 'buffett', 'zhangxuefeng', 'feynman')."
+        ),
+    )
+    parser.add_argument(
+        "--no-skills-discovery",
+        action="store_true",
+        help="Disable Skills Discovery (skip persona recommendations).",
+    )
     return parser.parse_args()
 
 
@@ -76,29 +90,32 @@ def _configure_logging(log_level: int) -> logging.Logger:
     return logging.getLogger(__name__)
 
 
-async def main() -> None:
-    """Run the deep research agent with streaming output."""
-    args = _parse_args()
-    log_level = _resolve_log_level(args)
-    logger = _configure_logging(log_level)
+async def _run_stream(
+    args: argparse.Namespace,
+    logger: logging.Logger,
+    checkpointer: "MemorySaver",
+) -> tuple[str, int]:
+    """Run stream_deep_research, return (report, tool_calls).
 
-    # Use MemorySaver for multi-turn support within this process
-    from langgraph.checkpoint.memory import MemorySaver
-    checkpointer = MemorySaver()
+    Args:
+        args: CLI arguments.
+        logger: Logger instance.
+        checkpointer: MemorySaver for multi-turn support.
 
+    Returns:
+        Tuple of (report_text, tool_call_count).
+    """
     from deep_research_agent.agents import stream_deep_research
-
-    logger.info("Query: %s", args.query)
-    if args.thread_id:
-        logger.info("Thread ID: %s (multi-turn mode)", args.thread_id)
-    logger.info("Starting deep research agent (this may take a few minutes)...")
 
     report = ""
     tool_calls = 0
+
     async for event in stream_deep_research(
         args.query,
         thread_id=args.thread_id,
         checkpointer=checkpointer,
+        persona_id=args.persona,
+        enable_skills_discovery=not args.no_skills_discovery,
     ):
         event_type = event["type"]
 
@@ -127,15 +144,42 @@ async def main() -> None:
         elif event_type == "final_report":
             report = event["data"]
 
+    return report, tool_calls
+
+
+async def main() -> None:
+    """Run the deep research agent with streaming output."""
+    args = _parse_args()
+    log_level = _resolve_log_level(args)
+    logger = _configure_logging(log_level)
+
+    # Use MemorySaver for multi-turn support within this process
+    from langgraph.checkpoint.memory import MemorySaver
+    checkpointer = MemorySaver()
+
+    logger.info("Query: %s", args.query)
+    if args.thread_id:
+        logger.info("Thread ID: %s (multi-turn mode)", args.thread_id)
+    if args.persona:
+        logger.info("Persona: %s", args.persona)
+    if not args.no_skills_discovery:
+        logger.info("Skills Discovery: enabled (autonomous)")
+    logger.info("Starting deep research agent (this may take a few minutes)...")
+
+    report, tool_calls = await _run_stream(args, logger, checkpointer)
+
     logger.info("=" * 80)
     logger.info("Research complete — %d tool calls", tool_calls)
 
-    # Save to file
+    # Save to file — strip any leading '---' that the LLM may emit,
+    # which Markdown previewers misinterpret as YAML front matter.
+    clean_report = report.lstrip("-").lstrip("\n") if report else ""
     report_path = os.path.join(os.path.dirname(__file__), "deep_agent_report.md")
     with open(report_path, "w", encoding="utf-8") as f:
-        f.write(report)
+        f.write(clean_report)
     logger.info("Report saved to %s", report_path)
 
 
 if __name__ == "__main__":
     asyncio.run(main())
+

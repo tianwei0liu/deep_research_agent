@@ -5,5 +5,11 @@ from deep_research_agent.agents.agent import (
     run_deep_research,
     stream_deep_research,
 )
+from deep_research_agent.agents.mcp_client import MCPSearchClient
 
-__all__ = ["build_deep_agent", "run_deep_research", "stream_deep_research"]
+__all__ = [
+    "build_deep_agent",
+    "run_deep_research",
+    "stream_deep_research",
+    "MCPSearchClient",
+]

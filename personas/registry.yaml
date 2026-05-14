@@ -1,0 +1,201 @@
+# Persona Framework Registry
+# All 19 personas suitable for deep research analysis injection.
+# Each entry maps a persona_id to its framework file and metadata.
+#
+# Upstream sources are recorded for traceability. All upstream repos
+# currently lack explicit LICENSE declarations (personal project use only).
+
+personas:
+  # ── Business Thinking ──────────────────────────────────────────────
+  buffett:
+    file: frameworks/buffett.md
+    display_name: "巴菲特"
+    description: "价值投资 / 护城河 / 安全边际 / 能力圈"
+    max_tokens: 800
+    applicable_domains: [finance, investment, business]
+    upstream:
+      repo: "https://github.com/will2025btc/buffett-perspective"
+      license: "NONE"
+
+  munger:
+    file: frameworks/munger.md
+    display_name: "芒格"
+    description: "多元思维模型 / 逆向思考 / 跨学科"
+    max_tokens: 800
+    applicable_domains: [investment, decision_making, philosophy]
+    upstream:
+      repo: "https://github.com/alchaincyf/munger-skill"
+      license: "NONE"
+
+  jobs:
+    file: frameworks/jobs.md
+    display_name: "乔布斯"
+    description: "产品直觉 / 设计 / 战略 / 用户体验"
+    max_tokens: 800
+    applicable_domains: [product, design, strategy]
+    upstream:
+      repo: "https://github.com/alchaincyf/steve-jobs-skill"
+      license: "NONE"
+
+  musk:
+    file: frameworks/musk.md
+    display_name: "马斯克"
+    description: "第一性原理 / 工程 / 成本 / 激进执行"
+    max_tokens: 800
+    applicable_domains: [engineering, technology, manufacturing]
+    upstream:
+      repo: "https://github.com/alchaincyf/elon-musk-skill"
+      license: "NONE"
+
+  feynman:
+    file: frameworks/feynman.md
+    display_name: "费曼"
+    description: "学习 / 教学 / 科学思维 / 费曼技巧"
+    max_tokens: 800
+    applicable_domains: [science, learning, education]
+    upstream:
+      repo: "https://github.com/alchaincyf/feynman-skill"
+      license: "NONE"
+
+  naval:
+    file: frameworks/naval.md
+    display_name: "纳瓦尔"
+    description: "财富 / 杠杆 / 人生哲学"
+    max_tokens: 800
+    applicable_domains: [wealth, philosophy, startups]
+    upstream:
+      repo: "https://github.com/alchaincyf/naval-skill"
+      license: "NONE"
+
+  taleb:
+    file: frameworks/taleb.md
+    display_name: "塔勒布"
+    description: "风险 / 反脆弱 / 不确定性 / 黑天鹅"
+    max_tokens: 800
+    applicable_domains: [risk, finance, decision_making]
+    upstream:
+      repo: "https://github.com/alchaincyf/taleb-skill"
+      license: "NONE"
+
+  duan_yongping:
+    file: frameworks/duan_yongping.md
+    display_name: "段永平"
+    description: "买股票就是买公司 / 现金流折现 / 本分"
+    max_tokens: 800
+    applicable_domains: [investment, business, management]
+    upstream:
+      repo: "https://github.com/derrickgong87/duan-yongping-skill"
+      license: "NONE"
+
+  zhang_yiming:
+    file: frameworks/zhang_yiming.md
+    display_name: "张一鸣"
+    description: "产品 / 组织 / 全球化 / 人才"
+    max_tokens: 800
+    applicable_domains: [product, organization, globalization]
+    upstream:
+      repo: "https://github.com/alchaincyf/zhang-yiming-skill"
+      license: "NONE"
+
+  trump:
+    file: frameworks/trump.md
+    display_name: "特朗普"
+    description: "谈判 / 权力 / 传播 / 行为预判"
+    max_tokens: 800
+    applicable_domains: [negotiation, politics, communication]
+    upstream:
+      repo: "https://github.com/alchaincyf/trump-skill"
+      license: "NONE"
+
+  paul_graham:
+    file: frameworks/paul_graham.md
+    display_name: "Paul Graham"
+    description: "创业 / YC 投资哲学 / 写作"
+    max_tokens: 800
+    applicable_domains: [startups, writing, technology]
+    upstream:
+      repo: "https://github.com/alchaincyf/paul-graham-skill"
+      license: "NONE"
+
+  # ── Education / Social Analysis ────────────────────────────────────
+  zhangxuefeng:
+    file: frameworks/zhangxuefeng.md
+    display_name: "张雪峰"
+    description: "教育 / 职业规划 / 阶层流动 / 就业倒推法"
+    max_tokens: 800
+    applicable_domains: [education, career_planning]
+    upstream:
+      repo: "https://github.com/alchaincyf/zhangxuefeng-skill"
+      license: "NONE"
+
+  zizek:
+    file: frameworks/zizek.md
+    display_name: "齐泽克"
+    description: "意识形态批判 / 辩证法 / 反常识"
+    max_tokens: 800
+    applicable_domains: [philosophy, politics, culture]
+    upstream:
+      repo: "https://github.com/JikunR/zizek-skill"
+      license: "NONE"
+
+  maoxuan:
+    file: frameworks/maoxuan.md
+    display_name: "毛选"
+    description: "矛盾分析 / 调查研究 / 群众路线 / 策略制定"
+    max_tokens: 800
+    applicable_domains: [strategy, politics, organization]
+    upstream:
+      repo: "https://github.com/leezythu/maoxuan-skill"
+      license: "NONE"
+
+  # ── AI / Technology ────────────────────────────────────────────────
+  karpathy:
+    file: frameworks/karpathy.md
+    display_name: "Karpathy"
+    description: "深度学习 / 教育 / 工程实践"
+    max_tokens: 800
+    applicable_domains: [ai, deep_learning, engineering]
+    upstream:
+      repo: "https://github.com/alchaincyf/karpathy-skill"
+      license: "NONE"
+
+  ilya:
+    file: frameworks/ilya.md
+    display_name: "Ilya Sutskever"
+    description: "AGI / 安全 / 研究方向"
+    max_tokens: 800
+    applicable_domains: [ai, research, safety]
+    upstream:
+      repo: "https://github.com/alchaincyf/ilya-sutskever-skill"
+      license: "NONE"
+
+  # ── Content / Media ────────────────────────────────────────────────
+  mrbeast:
+    file: frameworks/mrbeast.md
+    display_name: "MrBeast"
+    description: "YouTube 增长 / 内容创作 / 传播"
+    max_tokens: 800
+    applicable_domains: [content, marketing, media]
+    upstream:
+      repo: "https://github.com/alchaincyf/mrbeast-skill"
+      license: "NONE"
+
+  guodegang:
+    file: frameworks/guodegang.md
+    display_name: "郭德纲"
+    description: "相声逻辑 / 叙事结构 / 幽默"
+    max_tokens: 800
+    applicable_domains: [storytelling, humor, communication]
+    upstream:
+      repo: "https://github.com/ByteRax/guodegang-skills"
+      license: "NONE"
+
+  saul_goodman:
+    file: frameworks/saul_goodman.md
+    display_name: "Saul Goodman"
+    description: "谈判 / 说服 / 逻辑角度 / 法律思维"
+    max_tokens: 800
+    applicable_domains: [negotiation, law, persuasion]
+    upstream:
+      repo: "https://github.com/YeJe-cpu/saul-goodman-skill"
+      license: "NONE"

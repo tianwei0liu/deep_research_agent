@@ -59,7 +59,15 @@ class BudgetTrackingMiddleware(AgentMiddleware[Any, Any, Any]):
     # ------------------------------------------------------------------
 
     def _build_budget_message(self, current_turn: int) -> str:
-        """Build the dynamic budget status block.
+        """Build the dynamic budget status block with progressive urgency.
+
+        Implements a 4-tier escalation system to condition the LLM into
+        respecting budget constraints from the very first turn:
+
+        - **NORMAL** (>50% budget remaining): Inform + warn about overrun consequences.
+        - **ELEVATED** (25-50% budget remaining): Demand wrap-up planning.
+        - **CRITICAL** (≤ threshold turns remaining): Demand immediate finalization.
+        - **OVERRUN** (past budget): Maximum urgency — force report output.
 
         Args:
             current_turn: 1-indexed turn number (next turn about to start).
@@ -68,19 +76,41 @@ class BudgetTrackingMiddleware(AgentMiddleware[Any, Any, Any]):
             Formatted budget status string.
         """
         remaining = max(self._max_turns - current_turn, 0)
+        used_ratio = current_turn / self._max_turns if self._max_turns > 0 else 1.0
 
         lines = [
-            "## ⏱ Budget Status (auto-injected, do NOT ignore)",
+            "## ⏱ Budget Status (auto-injected — YOU MUST OBEY)",
             f"- Current turn: {current_turn} / {self._max_turns}",
             f"- Remaining turns: {remaining}",
         ]
 
-        if remaining <= self._critical_threshold:
+        if current_turn > self._max_turns:
+            # OVERRUN — past the hard limit
             lines.append(
-                "- Status: 🚨 CRITICAL — You MUST stop ALL research "
-                "immediately. Synthesize whatever partial findings you "
-                "have and produce the final report NOW. Do NOT delegate "
-                "any more tasks."
+                "- Status: 🛑 OVERRUN — You have EXCEEDED your turn budget! "
+                "The system will forcibly terminate your session after this "
+                "turn. You MUST output a final report RIGHT NOW using only "
+                "the findings you already have. Do NOT call any research "
+                "tools. Do NOT delegate to workers. Synthesize immediately "
+                "and delegate to citation-specialist, or write the report "
+                "yourself with citations. ANY other action is FORBIDDEN."
+            )
+            self._logger.error(
+                "Budget OVERRUN: turn %d/%d — LLM exceeded hard limit",
+                current_turn,
+                self._max_turns,
+            )
+        elif remaining <= self._critical_threshold:
+            # CRITICAL — about to hit the wall
+            lines.append(
+                f"- Status: 🚨 CRITICAL — Only {remaining} turn(s) left! "
+                "You MUST stop ALL research immediately. Do NOT delegate "
+                "any new research tasks. Synthesize whatever findings you "
+                "have and produce the final report NOW. If you do not "
+                "finish within your remaining turns, the system will "
+                "forcibly terminate your session and the report will be "
+                "INCOMPLETE and TRUNCATED. This is your LAST chance to "
+                "produce a quality report."
             )
             self._logger.warning(
                 "Budget CRITICAL: turn %d/%d, remaining=%d",
@@ -88,8 +118,35 @@ class BudgetTrackingMiddleware(AgentMiddleware[Any, Any, Any]):
                 self._max_turns,
                 remaining,
             )
+        elif used_ratio >= 0.5:
+            # ELEVATED — past the halfway point
+            lines.append(
+                f"- Status: ⚠️ ELEVATED — You have used {current_turn} of "
+                f"{self._max_turns} turns ({used_ratio:.0%}). You are past "
+                "the halfway point. You MUST begin wrapping up your research. "
+                "Finish any in-progress tasks, but do NOT start new lines of "
+                "investigation. Plan to write your final report within the "
+                f"next {remaining} turns. If you exceed the budget, the "
+                "system will forcibly terminate your session and produce an "
+                "INCOMPLETE report. Prioritize depth over breadth from now on."
+            )
+            self._logger.info(
+                "Budget ELEVATED: turn %d/%d, remaining=%d",
+                current_turn,
+                self._max_turns,
+                remaining,
+            )
         else:
-            lines.append("- Status: ✅ NORMAL — continue research as planned.")
+            # NORMAL — still have budget, but always warn about consequences
+            lines.append(
+                f"- Status: ✅ NORMAL — You have {remaining} turns remaining. "
+                "Plan your research to complete well within this budget. "
+                f"Remember: if you exceed {self._max_turns} turns, the system "
+                "will forcibly terminate your session and the report will be "
+                "INCOMPLETE. Budget your turns wisely — reserve at least "
+                f"{self._critical_threshold + 1} turns for report writing and "
+                "citation."
+            )
             self._logger.debug(
                 "Budget NORMAL: turn %d/%d, remaining=%d",
                 current_turn,

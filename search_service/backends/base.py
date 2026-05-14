@@ -11,8 +11,9 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
+from search_service.backends.result_filter import SearchResultFilter
 from search_service.cache import CACHE_TTL, CacheLayer, generate_cache_key
 from search_service.exceptions import AllProvidersExhaustedError, SearchProviderError
 from search_service.models import SearchResponse
@@ -69,10 +70,12 @@ class SearchRouter:
         self,
         backends: list[SearchBackend],
         cache: CacheLayer,
+        result_filter: Optional[SearchResultFilter] = None,
     ) -> None:
         self._backends = {b.name: b for b in backends}
         self._fallback_order = [b.name for b in backends]
         self._cache = cache
+        self._filter = result_filter or SearchResultFilter()
         self._logger = logging.getLogger(__name__)
 
     async def search(self, query: str, **kwargs: Any) -> SearchResponse:
@@ -104,6 +107,13 @@ class SearchRouter:
                 result = await self._backends[name].search(query, **kwargs)
                 elapsed_ms = int((time.monotonic() - start) * 1000)
 
+                # Post-process: dedup, empty removal, relevance filter
+                raw_count = result.result_count
+                result.results = self._filter.filter(
+                    result.results, query,
+                )
+                result.result_count = len(result.results)
+
                 self._logger.info(
                     "search_request",
                     extra={
@@ -112,6 +122,7 @@ class SearchRouter:
                         "latency_ms": elapsed_ms,
                         "status": "success",
                         "result_count": result.result_count,
+                        "raw_count": raw_count,
                         "backend": name,
                     },
                 )

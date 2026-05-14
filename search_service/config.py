@@ -12,6 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal, Optional
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,13 +36,33 @@ class SearchServiceConfig(BaseSettings):
         weixin_rpm: Weixin (Sogou) requests-per-minute limit.
     """
 
-    # SearXNG
+    # Bocha API (primary backend when configured)
+    bocha_api_key: Optional[str] = Field(
+        default=None,
+        description="Bocha Search API key. When set, BochaClient is "
+                    "registered as the primary search backend.",
+    )
+    bocha_base_url: str = Field(
+        default="https://api.bochaai.com",
+        description="Bocha API base URL.",
+    )
+    bocha_timeout_seconds: float = Field(
+        default=10.0,
+        description="Bocha API request timeout in seconds.",
+    )
+    bocha_summary_enabled: bool = Field(
+        default=False,
+        description="Request AI-generated summaries from Bocha. "
+                    "Increases latency by 1-3s per call.",
+    )
+
+    # SearXNG (fallback when Bocha is configured; primary otherwise)
     searxng_base_url: str = "http://localhost:8080"
     searxng_timeout_seconds: float = 8.0
     searxng_max_retries: int = 3
 
     # Browser Pool
-    browser_max_concurrency: int = 3
+    browser_max_concurrency: int = 10
     browser_max_requests_per_instance: int = 100
     browser_memory_limit_mb: int = 512
 

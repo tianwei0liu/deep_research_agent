@@ -46,12 +46,16 @@ class FakeBackend:
 
 
 def _make_response(query: str = "test", n: int = 1) -> SearchResponse:
-    """Helper to create a SearchResponse with N dummy results."""
+    """Helper to create a SearchResponse with N dummy results.
+
+    Results include the query in title/content so they survive
+    the SearchResultFilter's relevance filtering.
+    """
     items = [
         SearchResultItem(
-            title=f"Result {i}",
+            title=f"Result {i} about {query}",
             url=f"https://example.com/{i}",
-            content=f"Content {i}",
+            content=f"Detailed content about {query} — item {i}",
             source_engine=SearchEngine.SEARXNG,
         )
         for i in range(n)

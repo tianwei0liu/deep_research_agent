@@ -53,6 +53,7 @@ class SearchMCPServer:
             max_results: int = 10,
             engines: str = "",
             time_range: str = "",
+            language: str = "auto",
         ) -> dict:
             """Search the internet for current information.
 
@@ -67,6 +68,14 @@ class SearchMCPServer:
                 max_results: Max results (1-20).
                 engines: Comma-separated engine list (e.g. "bing,baidu").
                 time_range: Time filter — "", "day", "week", "month", "year".
+                language: Search language hint. Use 'zh-CN' for Chinese
+                    content sources, 'en-US' for English content sources,
+                    or 'auto' to detect from query text.
+                    When the topic has stronger English-language coverage
+                    (e.g., US/EU companies, academic research, open-source
+                    projects), prefer 'en-US' even if the user query is
+                    in Chinese. For cross-language research, make two
+                    parallel calls with different language settings.
 
             Returns:
                 Search results with titles, urls, and content snippets.
@@ -79,6 +88,7 @@ class SearchMCPServer:
             response = await self._router.search(
                 query, max_results=max_results,
                 engines=engine_list, time_range=time_range,
+                language=language,
             )
             return response.model_dump()
 
@@ -183,11 +193,54 @@ class SearchMCPServer:
                 timeout_seconds: Page load timeout.
                 max_content_length: Max content characters.
             """
-            scraper = self._get_page_scraper()
-            response = await scraper.scrape(
-                url, timeout_seconds, max_content_length,
+            from search_service.exceptions import (
+                BrowserPoolExhaustedError,
+                ContentExtractionError,
             )
-            return response.model_dump()
+
+            scraper = self._get_page_scraper()
+            try:
+                response = await scraper.scrape(
+                    url, timeout_seconds, max_content_length,
+                )
+                return response.model_dump()
+            except BrowserPoolExhaustedError as exc:
+                self._logger.warning(
+                    "scrape_url_pool_exhausted",
+                    extra={
+                        "url": url,
+                        "max_concurrency": exc.max_concurrency,
+                        "wait_timeout": exc.wait_timeout_seconds,
+                    },
+                )
+                return {
+                    "url": url,
+                    "title": "",
+                    "content": "",
+                    "content_length": 0,
+                    "metadata": {
+                        "error": True,
+                        "reason": (
+                            "Browser pool busy — too many concurrent scrape "
+                            "requests. Try again later or skip this URL."
+                        ),
+                    },
+                }
+            except ContentExtractionError as exc:
+                self._logger.warning(
+                    "scrape_url_extraction_failed",
+                    extra={"url": url, "reason": exc.reason},
+                )
+                return {
+                    "url": url,
+                    "title": "",
+                    "content": "",
+                    "content_length": 0,
+                    "metadata": {
+                        "error": True,
+                        "reason": exc.reason,
+                    },
+                }
 
         # Store handlers for direct testing
         self._tool_handlers = {
@@ -202,15 +255,46 @@ class SearchMCPServer:
     # --- Lifecycle ---
 
     async def startup(self) -> None:
-        """Initialize all backends."""
+        """Initialize all backends.
+
+        When ``bocha_api_key`` is configured, BochaClient is registered
+        as the primary backend with SearXNG as fallback. Otherwise,
+        SearXNG is the sole backend (backward-compatible).
+        """
         cache = NullCache()
-        searxng = SearXNGClient(self._config)
-        self._router = SearchRouter(backends=[searxng], cache=cache)
+        backends: list = []
 
-        self._browser_pool = BrowserPool(self._config)
-        await self._browser_pool.start()
+        # Bocha as primary backend (only when API key is configured)
+        if self._config.bocha_api_key:
+            from search_service.backends.bocha_client import BochaClient
+            backends.append(BochaClient(self._config))
+            self._logger.info("bocha_backend_enabled")
+        else:
+            # SearXNG as sole backend when Bocha is not configured.
+            # NOTE: SearXNG is currently disabled as a fallback behind
+            # Bocha due to unresolved CAPTCHA issues. Re-enable as a
+            # fallback once captcha_mitigation_strategy.md is implemented.
+            backends.append(SearXNGClient(self._config))
+            self._logger.info("searxng_backend_enabled (no bocha key)")
 
-        self._logger.info("search_service_started")
+        self._router = SearchRouter(backends=backends, cache=cache)
+
+        # BrowserPool is only needed for scrape_url and platform scrapers.
+        # If Playwright/Chromium is unavailable, degrade gracefully.
+        try:
+            self._browser_pool = BrowserPool(self._config)
+            await self._browser_pool.start()
+        except Exception as exc:
+            self._logger.warning(
+                "browser_pool_start_failed — scrape_url will be unavailable",
+                extra={"error": str(exc)},
+            )
+            self._browser_pool = None
+
+        self._logger.info(
+            "search_service_started",
+            extra={"backends": [b.name for b in backends]},
+        )
 
     async def shutdown(self) -> None:
         """Clean up all resources."""
@@ -226,7 +310,7 @@ class SearchMCPServer:
         """Async entry point: startup → serve → shutdown."""
         await self.startup()
         try:
-            await self._mcp.run_async(transport="stdio")
+            await self._mcp.run_stdio_async()
         finally:
             await self.shutdown()
 

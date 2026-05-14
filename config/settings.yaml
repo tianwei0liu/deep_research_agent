@@ -32,10 +32,10 @@ deepseek_base_url: "https://api.deepseek.com"
 
 # Orchestrator & Worker Limits
 max_parallel_workers: 10
-supervisor_max_turns: 35
+supervisor_max_turns: 10
 supervisor_max_search_calls: 10
-worker_max_search_calls: 60
-worker_max_turns: 20
+worker_max_search_calls: 10
+worker_max_turns: 10
 worker_max_output_tokens: 8192
 
 # Citation Agent Limits

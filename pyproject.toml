@@ -17,6 +17,7 @@ dependencies = [
     "pyyaml>=6.0",
     "deepagents @ git+https://github.com/langchain-ai/deepagents.git#subdirectory=libs/deepagents",
     "tavily-python",
+    "langchain-mcp-adapters>=0.1.0",
 ]
 
 [project.optional-dependencies]

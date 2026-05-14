@@ -35,22 +35,30 @@ class StealthInjector:
     )
     _cached_script: ClassVar[Optional[str]] = None
 
+    _FALLBACK_SCRIPT: ClassVar[str] = (
+        "// stealth.min.js not available — running without anti-detection\n"
+        "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
+    )
+
     @classmethod
     def load_script(cls) -> str:
         """Load stealth.js script content (cached after first read).
 
+        Returns a minimal navigator.webdriver override if the full
+        stealth.min.js is not present, rather than raising an error.
+
         Returns:
             The JavaScript source as a string.
-
-        Raises:
-            FileNotFoundError: If ``stealth.min.js`` is not found at
-                the expected path.
         """
         if cls._cached_script is None:
             if not cls._SCRIPT_PATH.exists():
-                raise FileNotFoundError(
-                    f"stealth.min.js not found at {cls._SCRIPT_PATH}. "
-                    "Run 'npx extract-stealth-evasions' to generate it."
+                import logging
+                logging.getLogger(__name__).warning(
+                    "stealth.min.js not found at %s — using minimal fallback. "
+                    "Run 'npx extract-stealth-evasions' to generate it.",
+                    cls._SCRIPT_PATH,
                 )
-            cls._cached_script = cls._SCRIPT_PATH.read_text(encoding="utf-8")
+                cls._cached_script = cls._FALLBACK_SCRIPT
+            else:
+                cls._cached_script = cls._SCRIPT_PATH.read_text(encoding="utf-8")
         return cls._cached_script
